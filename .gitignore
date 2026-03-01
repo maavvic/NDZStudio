@@ -1,0 +1,40 @@
+# WordPress Common
+.wp-env.override.json
+wp-cli.local.yml
+error_log
+wp-config.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/cache/
+
+# JS/Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+dist-*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
+
+# IDE & OS
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+Thumbs.db
+
+# Plugin Specific
+aipg-prototype-*/
+# Ignore ZIP files (usually build results)
+*.zip
