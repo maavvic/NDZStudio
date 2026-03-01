@@ -199,6 +199,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                                         <div class="ws-preview-status" style="display:none;">
                                             <div class="ws-mini-spinner"></div> <span class="ws-status-text">Architecting...</span>
                                         </div>
+                                        <button class="ws-btn ws-btn-secondary ws-btn-save-project" data-idx="${idx}" style="margin-top:10px; width:100%; justify-content:center;">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                                            Save to My Projects
+                                        </button>
                                     </div>
                                 </div>
                             `).join('')}
@@ -275,8 +279,16 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
             const html = `
                 <div class="ws-wizard-step" key="${this.currentStep}">
-                    <h2 class="ws-title">${step.title}</h2>
-                    <p class="ws-subtitle">${step.subtitle}</p>
+                    <div class="ws-step-header" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h2 class="ws-title">${step.title}</h2>
+                            <p class="ws-subtitle">${step.subtitle}</p>
+                        </div>
+                        <button class="ws-btn ws-btn-secondary ws-btn-sm" id="ws-btn-my-projects">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            My Projects
+                        </button>
+                    </div>
                     
                     <div id="ws-step-content">
                         ${step.render()}
@@ -371,6 +383,30 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 if (self.currentStep > 0) {
                     self.currentStep--;
                     self.render();
+                }
+            });
+
+            $(document).on('click', '#ws-btn-my-projects', function () {
+                self.showProjectsView();
+            });
+
+            $(document).on('click', '.ws-btn-save-project', function (e) {
+                e.stopPropagation();
+                const idx = $(this).data('idx');
+                const $btn = $(this);
+                const template = self.templates[idx];
+                self.saveToLibrary(template, $btn);
+            });
+
+            $(document).on('click', '.ws-btn-deploy-pj', function () {
+                const pjId = $(this).data('id');
+                self.deployProject(pjId);
+            });
+
+            $(document).on('click', '.ws-btn-remove-pj', function () {
+                const pjId = $(this).data('id');
+                if (confirm('Are you sure? This will permanently delete all pages and content for this project.')) {
+                    self.removeProject(pjId);
                 }
             });
         },
@@ -534,13 +570,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
-                palette: self.data.palette.fineTuned
+                palette: self.data.palette.variation
             };
 
             $.post(ajaxurl, payload, function (res) {
                 if (res.success && res.data.status === 'COMPLETED') {
                     $status.find('.ws-status-text').text('Installing Prototype...');
-                    self.installPrototype(res.data.response, template.name, $card);
+                    self.installPrototype(res.data.response, template.name, $card, template.id);
                 } else {
                     $status.find('.ws-status-text').text('Generation Error');
                     $btn.prop('disabled', false).css('opacity', 1);
@@ -551,7 +587,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             });
         },
 
-        installPrototype: function (code, name, $card) {
+        installPrototype: function (code, name, $card, project_id) {
             const self = this;
             const $status = $card.find('.ws-preview-status');
 
@@ -559,16 +595,167 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 action: 'aipg_install_prototype',
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 code: code,
-                template_name: name
+                template_name: name,
+                project_id: project_id
             }, function (res) {
                 if (res.success) {
-                    $status.html(`
-                        <a href="${res.data.preview_url}" target="_blank" class="ws-btn ws-btn-primary ws-btn-launch" style="text-decoration:none;">
+                    $status.show().html(`
+                        <a href="${res.data.preview_url}" target="_blank" class="ws-btn ws-btn-primary ws-btn-launch" style="text-decoration:none; display:inline-flex;">
                             Launch Live Preview
                         </a>
                     `);
+                    $card.find('.ws-btn-preview').hide();
                 } else {
                     alert('Installation failed: ' + res.data);
+                }
+            });
+        },
+
+        showProjectsView: function () {
+            const self = this;
+            $('#wp-studio-wizard-root').html(`
+                <div class="ws-wizard-step">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h2 class="ws-title">My AI Studio Projects</h2>
+                        <button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="location.reload()">Back to Wizard</button>
+                    </div>
+                    <p class="ws-subtitle">Manage your saved layouts and active deployments.</p>
+                    
+                    <div id="ws-projects-list" class="ws-ai-loading">
+                        <div class="ws-mini-spinner"></div> Loading your library...
+                    </div>
+                </div>
+            `);
+
+            $.post(ajaxurl, {
+                action: 'aipg_list_studio_projects',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : ''
+            }, function (res) {
+                if (res.success) {
+                    self.renderProjectsList(res.data.projects, res.data.active_id);
+                } else {
+                    $('#ws-projects-list').html('<p>Error loading projects.</p>');
+                }
+            });
+        },
+
+        renderProjectsList: function (projects, activeId) {
+            if (!projects || projects.length === 0) {
+                $('#ws-projects-list').html('<p style="text-align:center; padding: 40px; color:#666;">No projects saved yet. Go through the wizard to architect your first one!</p>');
+                return;
+            }
+
+            const html = `
+                <div class="ws-template-grid" style="margin-top:20px;">
+                    ${projects.map(pj => `
+                        <div class="ws-template-card ${pj.id === activeId ? 'active' : ''}">
+                            <div class="ws-template-header">
+                                <h3 class="ws-template-name">${pj.name}</h3>
+                                <p class="ws-template-desc">Saved on ${new Date(pj.timestamp * 1000).toLocaleDateString()}</p>
+                            </div>
+                            <div style="margin-top:15px; display:flex; gap:10px;">
+                                <button class="ws-btn ws-btn-primary ws-btn-deploy-pj" data-id="${pj.id}" style="flex:1; justify-content:center;">
+                                    ${pj.id === activeId ? 'Re-Deploy' : 'Deploy Now'}
+                                </button>
+                                <button class="ws-btn ws-btn-secondary ws-btn-remove-pj" data-id="${pj.id}" style="color:#d93025; border-color:#d93025;">
+                                    Cleanup
+                                </button>
+                            </div>
+                            ${pj.id === activeId ? '<div style="margin-top:10px; font-size:12px; color:#2d6a4f; font-weight:bold;">● ACTIVE DEPLOYMENT</div>' : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            $('#ws-projects-list').removeClass('ws-ai-loading').html(html);
+        },
+
+        saveToLibrary: function (template, $btn) {
+            const self = this;
+            const originalText = $btn.text();
+            $btn.text('Saving...').prop('disabled', true);
+
+            // First generate the code if not already present
+            this.prepareProjectCode(template).then(code => {
+                $.post(ajaxurl, {
+                    action: 'aipg_save_studio_project',
+                    nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                    template_name: template.name,
+                    code: code
+                }, function (res) {
+                    if (res.success) {
+                        $btn.text('Saved! View in Library').addClass('ws-btn-primary').removeClass('ws-btn-secondary');
+                        setTimeout(() => { $btn.text(originalText).prop('disabled', false).removeClass('ws-btn-primary').addClass('ws-btn-secondary'); }, 3000);
+                    } else {
+                        alert('Save failed: ' + res.data);
+                        $btn.text(originalText).prop('disabled', false);
+                    }
+                });
+            }).catch(err => {
+                alert('Generation error: ' + err);
+                $btn.text(originalText).prop('disabled', false);
+            });
+        },
+
+        prepareProjectCode: async function (template) {
+            const res = await this.callAiStudio('generate-prototype', {
+                template_name: template.name,
+                prototype_prompt: template.prototype_prompt,
+                palette: this.data.palette.variation
+            });
+            if (res.status === 'COMPLETED') return res.response;
+            throw new Error('AI Generation failed');
+        },
+
+        deployProject: function (pjId) {
+            const self = this;
+            const $btn = $(`.ws-btn-deploy-pj[data-id="${pjId}"]`);
+            const originalText = $btn.text();
+            $btn.text('Deploying...').prop('disabled', true);
+
+            // Re-fetch project list from server to get the code for deployment
+            $.post(ajaxurl, {
+                action: 'aipg_list_studio_projects',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : ''
+            }, function (res) {
+                if (res.success) {
+                    const pj = res.data.projects.find(p => p.id === pjId);
+                    if (!pj) return;
+
+                    $.post(ajaxurl, {
+                        action: 'aipg_install_prototype',
+                        nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                        code: pj.code,
+                        project_id: pj.id,
+                        template_name: pj.name
+                    }, function (installRes) {
+                        if (installRes.success) {
+                            $btn.text('Success!').css('background', '#2d6a4f');
+                            setTimeout(() => { location.reload(); }, 1500);
+                        } else {
+                            alert('Deploy failed: ' + installRes.data);
+                            $btn.text(originalText).prop('disabled', false);
+                        }
+                    });
+                }
+            });
+        },
+
+        removeProject: function (pjId) {
+            const $btn = $(`.ws-btn-remove-pj[data-id="${pjId}"]`);
+            const originalText = $btn.text();
+            $btn.text('Deactivating...').prop('disabled', true);
+
+            $.post(ajaxurl, {
+                action: 'aipg_remove_studio_project',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                project_id: pjId,
+                delete_history: false // Keep in library by default
+            }, function (res) {
+                if (res.success) {
+                    location.reload();
+                } else {
+                    alert('Cleanup failed: ' + res.data);
+                    $btn.text(originalText).prop('disabled', false);
                 }
             });
         },

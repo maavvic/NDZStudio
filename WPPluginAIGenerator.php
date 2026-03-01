@@ -54,12 +54,15 @@ add_action( 'admin_menu', 'aipg_add_admin_menu' );
 // 2.1 Enqueue Admin Assets
 add_action( 'admin_enqueue_scripts', 'aipg_enqueue_admin_assets' );
 
-// 2.2 Redirect to Wizard if no projects exist
-add_action( 'admin_init', 'aipg_maybe_redirect_to_wizard' );
+// 2.2 Redirect to Wizard if no projects exist - Disabled to allow direct access to Features Generator
+// add_action( 'admin_init', 'aipg_maybe_redirect_to_wizard' );
 
 function aipg_enqueue_admin_assets( $hook ) {
-    $is_generator = ( 'toplevel_page_ai-generator' === $hook );
-    $is_wizard = ( 'toplevel_page_ai-studio-wizard' === $hook || strpos($hook, 'ai-studio-wizard') !== false );
+    // New menu hooks: 
+    // Parent/Studio: toplevel_page_nodevzone
+    // Features Generator: nodevzone_page_ai-generator
+    $is_generator = ( 'nodevzone_page_ai-generator' === $hook );
+    $is_wizard    = ( 'toplevel_page_nodevzone' === $hook || strpos($hook, 'nodevzone') !== false );
 
     if ( ! $is_generator && ! $is_wizard ) {
         return;
@@ -145,6 +148,86 @@ function aipg_enqueue_admin_assets( $hook ) {
     }
 }
 
+/**
+ * Enqueue AI Studio Editor Overlay on Frontend
+ */
+add_action( 'wp_enqueue_scripts', 'aipg_enqueue_studio_editor' );
+function aipg_enqueue_studio_editor() {
+    if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) return;
+    
+    // Use queried object ID for better reliability on front page
+    $post_id = get_queried_object_id();
+    if ( ! $post_id ) return;
+
+    // Check if this is an AI Studio generated page
+    if ( ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
+
+    wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
+    wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], AIPG_VERSION, true );
+
+    wp_localize_script( 'aipg-studio-editor-script', 'aipg_editor_vars', [
+        'ajaxurl' => admin_url( 'admin-ajax.php' ),
+        'nonce'   => wp_create_nonce( 'aipg_editor_nonce' ),
+        'post_id' => $post_id
+    ]);
+
+    // Diagnostic log in footer for admin
+    add_action('wp_footer', function() {
+        echo '<!-- AI Studio Editor Active -->';
+    }, 999);
+}
+
+/**
+ * Inject AI Studio Theme Tokens as CSS Variables
+ */
+add_action( 'wp_head', 'aipg_inject_studio_custom_styles', 100 );
+function aipg_inject_studio_custom_styles() {
+    $post_id = get_queried_object_id();
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
+
+    $theme_config = get_option( 'aipg_studio_theme_config', [] );
+    if ( empty( $theme_config ) ) return;
+
+    $css = ":root {\n";
+    
+    // 1. Process Color Palette
+    if ( isset( $theme_config['settings']['color']['palette'] ) ) {
+        foreach ( $theme_config['settings']['color']['palette'] as $color ) {
+            $slug = $color['slug'];
+            $hex  = $color['color'];
+            $css .= "  --wp--preset--color--{$slug}: {$hex} !important;\n";
+        }
+    }
+
+    // 2. Process Typography (if any)
+    if ( isset( $theme_config['settings']['typography']['fontFamilies'] ) ) {
+        foreach ( $theme_config['settings']['typography']['fontFamilies'] as $font ) {
+            $slug = $font['slug'];
+            $fam  = $font['fontFamily'];
+            $css .= "  --wp--preset--font-family--{$slug}: {$fam} !important;\n";
+        }
+    }
+
+    $css .= "}\n";
+
+    // Also inject a helper to ensure blocks use these colors if the theme is stubborn
+    $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); }\n";
+
+    echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
+}
+
+/**
+ * Add body class for AI Studio pages
+ */
+add_filter( 'body_class', 'aipg_studio_body_class' );
+function aipg_studio_body_class( $classes ) {
+    $post_id = get_queried_object_id();
+    if ( $post_id && get_post_meta( $post_id, '_aipg_studio_page', true ) ) {
+        $classes[] = 'aipg-studio-preview';
+    }
+    return $classes;
+}
+
 
 
 function aipg_add_admin_menu() {
@@ -153,26 +236,37 @@ function aipg_add_admin_menu() {
         $cap = 'manage_options';
     }
 
-    // 1. New AI Studio (Wizard)
+    $icon_svg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQgNFYyME00IDRMMjAgMjBNMjAgMjBWNCIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxjaXJjbGUgY3g9IjQiIGN5PSI0IiByPSIyIiBmaWxsPSJjdXJyZW50Q29sb3IiLz4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMiIgZmlsbD0iY3VycmVudENvbG9yIi8+Cjwvc3ZnPg==';
+
+    // 1. Parent Menu: NoDevZone
     add_menu_page(
-        'AI Studio',
-        'AI Studio',
+        'NoDevZone',
+        'NoDevZone',
         $cap,
-        'ai-studio-wizard',
+        'nodevzone',
         'aipg_render_wizard_page',
-        'dashicons-admin-site-alt3',
-        2 // Position it higher
+        $icon_svg,
+        2
     );
 
-    // 2. Old PL Generator
-    add_menu_page(
-        'PL Generator',
-        'PL Generator',
+    // 2. Submenu 1: AI Studio (Points to parent slug so it is the default landing page)
+    add_submenu_page(
+        'nodevzone',
+        'AI Studio',
+        'AI Studio',
+        $cap,
+        'nodevzone',
+        'aipg_render_wizard_page'
+    );
+
+    // 3. Submenu 2: AI Features Generator (formerly PL Generator)
+    add_submenu_page(
+        'nodevzone',
+        'AI Features Generator',
+        'AI Features Generator',
         $cap,
         'ai-generator',
-        'aipg_render_page',
-        'dashicons-admin-generic',
-        25 // Standard position
+        'aipg_render_page'
     );
 }
 
@@ -1542,7 +1636,7 @@ function aipg_ajax_generate_studio_prototype() {
     $prototype_prompt = isset( $_POST['prototype_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prototype_prompt'] ) ) : '';
     $palette = isset( $_POST['palette'] ) ? (array) $_POST['palette'] : [];
 
-    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000/' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-prototype';
 
     $response = wp_remote_post( $endpoint, [
@@ -1560,9 +1654,12 @@ function aipg_ajax_generate_studio_prototype() {
     }
 
     $body = wp_remote_retrieve_body( $response );
+    error_log('[AI Studio] RAW Response Length: ' . strlen($body));
+    
     $data = json_decode( $body, true );
 
     if ( ! $data || isset($data['detail']) ) {
+        error_log('[AI Studio] ERROR: ' . ($data['detail'] ?? 'JSON Decode Failed'));
         wp_send_json_error( $data['detail'] ?? 'Failed to communicate with SaaS' );
     }
 
@@ -1571,65 +1668,412 @@ function aipg_ajax_generate_studio_prototype() {
 
 add_action( 'wp_ajax_aipg_install_prototype', 'aipg_ajax_install_prototype' );
 function aipg_ajax_install_prototype() {
-    ob_start();
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
-    if ( ! aipg_is_plugins_writable() ) wp_send_json_error( 'Plugins directory not writable.' );
 
-    $code = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-    
-    // Clean markdown backticks if AI included them
-    if ( preg_match( '/```php\s+([\s\S]*?)\s*```/i', $code, $matches ) ) {
-        $code = $matches[1];
-    } elseif ( preg_match( '/```\s+([\s\S]*?)\s*```/i', $code, $matches ) ) {
-        $code = $matches[1];
-    }
-    $code = trim($code);
+    $raw_response = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+    $project_id   = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
+    $data = json_decode( $raw_response, true );
 
-    if ( ! empty($code) && strpos($code, '<?php') === false ) {
-        $code = "<?php\n" . $code;
+    if ( ! $data || ! isset( $data['pages'] ) ) {
+        wp_send_json_error( 'Invalid Gutenberg data received.' );
     }
 
-    $template_name = isset( $_POST['template_name'] ) ? sanitize_title( wp_unslash( $_POST['template_name'] ) ) : 'preview';
+    $installed_pages = [];
+    $home_page_id = 0;
 
-    if ( empty($code) ) wp_send_json_error( 'No code provided.' );
+    foreach ( $data['pages'] as $page_data ) {
+        $title   = sanitize_text_field( $page_data['title'] );
+        $slug    = sanitize_title( $page_data['slug'] );
+        $content = $page_data['content']; // Gutenberg blocks
 
-    $slug = 'aipg-prototype-' . $template_name;
-    $dir = WP_PLUGIN_DIR . '/' . $slug;
-    
-    require_once ABSPATH . 'wp-admin/includes/file.php';
-    require_once ABSPATH . 'wp-admin/includes/plugin.php';
-    WP_Filesystem();
-    global $wp_filesystem;
+        // Check if page already exists with this slug to avoid duplicates (searching all statuses)
+        $existing_pages = get_posts([
+            'name'           => $slug,
+            'post_type'      => 'page',
+            'post_status'    => ['publish', 'draft', 'pending', 'private'],
+            'posts_per_page' => 1,
+            'suppress_filters' => true
+        ]);
+        $existing_page = !empty($existing_pages) ? $existing_pages[0] : null;
+        
+        $post_args = [
+            'post_title'   => $title,
+            'post_name'    => $slug,
+            'post_content' => $content . "\n<!-- AI Studio Build: " . current_time('mysql') . " -->",
+            'post_status'  => 'publish',
+            'post_type'    => 'page',
+        ];
 
-    if ( ! $wp_filesystem->is_dir( $dir ) ) {
-        $wp_filesystem->mkdir( $dir );
-    }
+        if ( $existing_page ) {
+            error_log("[AI Studio] Updating existing page: {$slug} (ID: {$existing_page->ID}, Status: {$existing_page->post_status})");
+            $post_args['ID'] = $existing_page->ID;
+            $post_id = wp_update_post( $post_args );
+        } else {
+            error_log("[AI Studio] Creating new page: {$slug}");
+            $post_id = wp_insert_post( $post_args );
+        }
 
-    $file = $dir . '/' . $slug . '.php';
-    if ( ! $wp_filesystem->put_contents( $file, $code ) ) {
-        wp_send_json_error( 'Failed to write prototype file.' );
-    }
-
-    // Deactivate ANY previous prototypes to avoid conflicts and pollution
-    $active_plugins = get_option('active_plugins');
-    foreach ( $active_plugins as $plugin_path ) {
-        if ( strpos( $plugin_path, 'aipg-prototype-' ) !== false && $plugin_path !== ( $slug . '/' . $slug . '.php' ) ) {
-            deactivate_plugins( $plugin_path );
+        if ( ! is_wp_error( $post_id ) ) {
+            error_log("[AI Studio] SUCCESS: {$slug} (ID: {$post_id}) | Content Length: " . strlen($content));
+            $installed_pages[] = [ 'id' => $post_id, 'slug' => $slug ];
+            if ( strtolower($slug) === 'home' || $home_page_id === 0 ) {
+                $home_page_id = $post_id;
+            }
+            // Mark as an AI Studio page for the editor overlay
+            update_post_meta( $post_id, '_aipg_studio_page', '1' );
+            if ( ! empty($project_id) ) {
+                update_post_meta( $post_id, '_aipg_project_id', $project_id );
+            }
+        } else {
+            error_log("[AI Studio] ERROR installing page {$slug}: " . $post_id->get_error_message());
         }
     }
 
-    // Activate the plugin
-    $activate_result = activate_plugin( $slug . '/' . $slug . '.php' );
-    if ( is_wp_error( $activate_result ) ) {
-        error_log( 'Prototype Activation Error: ' . $activate_result->get_error_message() );
+    // Set static front page
+    if ( $home_page_id > 0 ) {
+        update_option( 'show_on_front', 'page' );
+        update_option( 'page_on_front', $home_page_id );
     }
 
-    ob_get_clean();
+    // Store theme tokens if provided
+    if ( isset( $data['theme_json'] ) ) {
+        error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
+        update_option( 'aipg_studio_theme_config', $data['theme_json'] );
+    } else {
+        // Clear if not provided to avoid stale styles
+        delete_option( 'aipg_studio_theme_config' );
+    }
+
+    if ( ! empty($project_id) ) {
+         update_option( 'aipg_studio_active_project', $project_id );
+    }
+
     wp_send_json_success([
-        'message' => 'Prototype installed and activated!',
-        'preview_url' => home_url('/')
+        'message'     => 'Real Gutenberg pages installed!',
+        'preview_url' => add_query_arg( '_aipg_preview', time(), home_url('/') )
     ]);
+}
+
+/**
+ * AJAX Handler for Saving Studio Projects
+ */
+add_action( 'wp_ajax_aipg_save_studio_project', 'aipg_ajax_save_studio_project' );
+function aipg_ajax_save_studio_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : 'Untitled Project';
+    $code = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // The JSON response from AI
+    
+    if ( empty($code) ) wp_send_json_error( 'No content to save.' );
+
+    $projects = get_option( 'aipg_studio_projects', [] );
+    $project_id = 'pj_' . substr( md5( $name . time() ), 0, 8 );
+
+    $projects[$project_id] = [
+        'id'        => $project_id,
+        'name'      => $name,
+        'code'      => $code, // Store raw AI JSON
+        'timestamp' => time()
+    ];
+
+    update_option( 'aipg_studio_projects', $projects );
+
+    wp_send_json_success([
+        'message'    => 'Project saved to library!',
+        'project_id' => $project_id
+    ]);
+}
+
+/**
+ * AJAX Handler for Listing Studio Projects
+ */
+add_action( 'wp_ajax_aipg_list_studio_projects', 'aipg_ajax_list_studio_projects' );
+function aipg_ajax_list_studio_projects() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $projects = get_option( 'aipg_studio_projects', [] );
+    $active_id = get_option( 'aipg_studio_active_project', '' );
+
+    wp_send_json_success([
+        'projects'  => array_values($projects),
+        'active_id' => $active_id
+    ]);
+}
+
+/**
+ * AJAX Handler for Removing a Project (Cleanup)
+ */
+add_action( 'wp_ajax_aipg_remove_studio_project', 'aipg_ajax_remove_studio_project' );
+function aipg_ajax_remove_studio_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $project_id = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
+    $delete_from_history = isset( $_POST['delete_history'] ) ? (bool) $_POST['delete_history'] : false;
+
+    if ( empty($project_id) ) wp_send_json_error( 'Invalid Project ID.' );
+
+    // 1. Find and delete all posts tagged with this project
+    $args = [
+        'post_type'      => 'any',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'   => '_aipg_project_id',
+                'value' => $project_id,
+            ]
+        ]
+    ];
+
+    $query = new WP_Query( $args );
+    $deactivated_count = 0;
+
+    if ( $query->have_posts() ) {
+        while ( $query->have_posts() ) {
+            $query->the_post();
+            wp_update_post([
+                'ID'          => get_the_ID(),
+                'post_status' => 'draft'
+            ]);
+            $deactivated_count++;
+        }
+        wp_reset_postdata();
+    }
+
+    // 2. Clear from library if requested
+    if ( $delete_from_history ) {
+        $projects = get_option( 'aipg_studio_projects', [] );
+        if ( isset($projects[$project_id]) ) {
+            unset($projects[$project_id]);
+            update_option( 'aipg_studio_projects', $projects );
+        }
+    }
+
+    // 3. Clear active project if it was this one
+    if ( get_option( 'aipg_studio_active_project' ) === $project_id ) {
+        delete_option( 'aipg_studio_active_project' );
+        // Optionally reset front page to default
+        update_option( 'show_on_front', 'posts' );
+    }
+
+    wp_send_json_success([
+        'message' => sprintf( 'Cleanup complete. %d items moved to drafts.', $deactivated_count )
+    ]);
+}
+
+/**
+ * AJAX Handler for Contextual AI Editing (See-Click-Prompt)
+ */
+add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+function aipg_ajax_studio_contextual_edit() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $prompt          = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+    $markup          = isset( $_POST['markup'] ) ? wp_unslash( $_POST['markup'] ) : ''; // Gutenberg block HTML
+    $computed_styles = isset( $_POST['computed_styles'] ) ? wp_unslash( $_POST['computed_styles'] ) : '';
+    $parent_markup   = isset( $_POST['parent_markup'] ) ? wp_unslash( $_POST['parent_markup'] ) : '';
+    $post_id         = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+
+    if ( empty( $prompt ) || empty( $markup ) || ! $post_id ) {
+        wp_send_json_error( 'Incomplete data for AI refinement.' );
+    }
+
+    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000' );
+    $license = get_option( 'aipg_license_key', '' );
+    $endpoint = rtrim($api_url, '/') . '/api/ai-studio/refine-block';
+
+    error_log('[AI Studio] Refining block in post ID: ' . $post_id);
+
+    $response = wp_remote_post( $endpoint, [
+        'headers'     => [
+            'Content-Type' => 'application/json',
+            'X-License-Key'=> $license,
+        ],
+        'body'        => wp_json_encode([
+            'prompt'          => $prompt,
+            'markup'          => $markup,
+            'computed_styles' => json_decode($computed_styles, true),
+            'parent_markup'   => $parent_markup,
+            'theme_config'    => get_option( 'aipg_studio_theme_config', [] )
+        ]),
+        'timeout'     => 45,
+    ]);
+
+    if ( is_wp_error( $response ) ) {
+        error_log('[AI Studio] Refinement API ERROR: ' . $response->get_error_message());
+        wp_send_json_error( $response->get_error_message() );
+    }
+
+    $body = wp_remote_retrieve_body( $response );
+    error_log('[AI Studio] Refinement RAW Response: ' . $body);
+
+    $data = json_decode( $body, true );
+    if ( ! $data || ! isset( $data['new_markup'] ) ) {
+        error_log('[AI Studio] Refinement Parse Error or missing new_markup');
+        wp_send_json_error( 'AI failed to refine this block.' );
+    }
+
+    // 1. Try primary post content
+    $post = get_post( $post_id );
+    $new_post_content = aipg_fuzzy_block_replace( $post->post_content, $markup, $data['new_markup'] );
+    $target_post_id = $post_id;
+    
+    // 2. TEMPLATE-AWARE FALLBACK: If not found, scan all Template Parts and Templates
+    if ( $new_post_content === $post->post_content ) {
+        error_log('[AI Studio] Block NOT found in primary post. Scanning templates/parts...');
+        $template_posts = get_posts([
+            'post_type'      => ['wp_template_part', 'wp_template', 'wp_block', 'wp_navigation'],
+            'posts_per_page' => -1,
+            'post_status'    => 'publish'
+        ]);
+
+        foreach ( $template_posts as $t_post ) {
+            $test_content = aipg_fuzzy_block_replace( $t_post->post_content, $markup, $data['new_markup'] );
+            if ( $test_content !== $t_post->post_content ) {
+                $new_post_content = $test_content;
+                $target_post_id = $t_post->ID;
+                error_log('[AI Studio] Block found and matched in Template/Part: ' . $t_post->post_name . ' (ID: ' . $t_post->ID . ')');
+                break;
+            }
+        }
+    }
+    
+    if ( $new_post_content === $post->post_content && $target_post_id === $post_id ) {
+        error_log('[AI Studio] CRITICAL: Markup replacement failed. Block not found in DB even after template scan.');
+        
+        $diag = [
+            'search' => $markup,
+            'skeleton_regex' => aipg_get_markup_skeleton_regex( $markup ),
+            'db_sample' => substr($post->post_content, 0, 5000),
+            'post_id' => $post_id,
+            'queried_templates_count' => count($template_posts ?? [])
+        ];
+        
+        wp_send_json_error( [
+            'message' => 'Could not find the block in current page or global templates to replace it.',
+            'diagnostics' => $diag
+        ] );
+    }
+
+    wp_update_post([
+        'ID'           => $target_post_id,
+        'post_content' => $new_post_content
+    ]);
+
+    wp_send_json_success([
+        'new_markup' => $data['new_markup']
+    ]);
+}
+
+/**
+ * Robustly replace a block in post content.
+ * Handles slight variations in whitespace or attributes between rendered DOM and DB.
+ */
+function aipg_fuzzy_block_replace( $content, $search, $replace ) {
+    // 2. Exact match check
+    if ( strpos( $content, $search ) !== false ) {
+        return str_replace( $search, $replace, $content );
+    }
+
+    // 2.5 Multi-block fallback: If search contains multiple top-level blocks
+    // and we can't find them together, they might be separated by different newlines in DB.
+    if ( preg_match_all('/<([a-z0-9]+)[^>]*>.*?<\/\\1>/is', $search, $matches) ) {
+        if (count($matches[0]) > 1) {
+            error_log('[AI Studio] Multi-block search detected. Trying flexible join...');
+            $parts = [];
+            foreach($matches[0] as $m) $parts[] = preg_quote(trim($m), '/');
+            $multi_regex = implode('(\s*|<!--.*?-->)*', $parts);
+            $multi_replaced = preg_replace("/$multi_regex/is", $replace, $content, 1);
+            if ($multi_replaced !== null && $multi_replaced !== $content) {
+                error_log('[AI Studio] SUCCESS: Multi-block match found.');
+                return $multi_replaced;
+            }
+        }
+    }
+
+    // 2. Normalized whitespace match
+    // Browsers often change \n or spaces. Normalize both to single spaces for comparison.
+    $norm_content = preg_replace( '/\s+/', ' ', $content );
+    $norm_search  = preg_replace( '/\s+/', ' ', $search );
+
+    if ( strpos( $norm_content, $norm_search ) !== false ) {
+        error_log('[AI Studio] Fuzzy match found via whitespace normalization.');
+        
+        $quoted_search = preg_quote( $norm_search, '/' );
+        $regex_search  = preg_replace( '/\s+/', '\s+', $quoted_search );
+        
+        $replaced = preg_replace( "/$regex_search/s", $replace, $content, 1 );
+        if ( $replaced !== null && $replaced !== $content ) {
+            return $replaced;
+        }
+    }
+
+    // 3. Skeleton match (Ultimate fallback)
+    // Create a regex that ignores all attributes and focuses on tag structure + text
+    error_log('[AI Studio] Attempting Skeleton-based matching...');
+    $skeleton_regex = aipg_get_markup_skeleton_regex( $search );
+    
+    $replaced = preg_replace( "/$skeleton_regex/s", $replace, $content, 1 );
+    if ( $replaced !== null && $replaced !== $content ) {
+        error_log('[AI Studio] SUCCESS: Match found via Skeleton Regex.');
+        return $replaced;
+    }
+
+    // 4. Last resort: Log details for debugging
+    error_log('[AI Studio] Block replacement FAILED after all attempts.');
+    return $content;
+}
+
+/**
+ * Generates a regex that matches the tag structure and text content of HTML,
+ * ignoring all attributes.
+ */
+function aipg_get_markup_skeleton_regex( $html ) {
+    // 1. Clean HTML: Remove comments and normalize
+    $html = preg_replace('/<!--\s+\/?wp:.*?-->/s', '', $html);
+    
+    // 2. Placeholder-ize tags to avoid preg_quote mess
+    $tags = [];
+    $html = preg_replace_callback('/<([a-z0-9]+)[^>]*>/i', function($m) use (&$tags) {
+        $id = count($tags);
+        $tags[$id] = $m[1];
+        return " __TAGSTART{$id}__ ";
+    }, $html);
+    
+    $html = preg_replace_callback('/<\/([a-z0-9]+)>/i', function($m) use (&$tags) {
+        $id = count($tags);
+        $tags[$id] = "CLOSE_" . $m[1];
+        return " __TAGEND{$id}__ ";
+    }, $html);
+
+    // 3. Escape the remaining text content
+    $regex = preg_quote( trim($html), '/' );
+    
+    // 4. Transform placeholders back to flexible regex patterns
+    foreach ($tags as $id => $type) {
+        if (strpos($type, 'CLOSE_') === 0) {
+            $tag_name = substr($type, 6);
+            $regex = str_replace("__TAGEND{$id}__", "<\/($tag_name)>", $regex);
+        } else {
+            $regex = str_replace("__TAGSTART{$id}__", "<($type)[^>]*>", $regex);
+        }
+    }
+
+    // 5. CRITICAL: Normalize all whitespace AND allow Gutenberg comments/newlines
+    $regex = preg_replace( '/\s+/', '(\s*|<!--.*?-->)*', $regex );
+    
+    // 6. Final Clean-up: Remove brittle escapes from preg_quote that we want to be literal
+    // This removes escapes from - : . and other symbols that preg_quote adds but we want clean
+    $regex = str_replace(['\\-', '\\:', '\\.', '\\ ', '\\(', '\\)', '\\,', '\\!', '\\?'], ['-', ':', '.', '(\s*|<!--.*?-->)*', '\(', '\)', ',', '!', '?'], $regex);
+    
+    // Ensure actual tag starts/ends are NOT double escaped
+    $regex = str_replace(['\\<', '\\>'], ['<', '>'], $regex);
+
+    return $regex;
 }
 
 
@@ -1818,8 +2262,8 @@ function aipg_ajax_sync_remote_projects() {
     }
 
     $license_key = get_option( 'aipg_license_key', '' );
-    // DEV-START
-    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
+    // DEV-START: Try localhost instead of host.docker.internal for non-docker setups
+    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
@@ -1832,11 +2276,12 @@ function aipg_ajax_sync_remote_projects() {
     ]);
 
     if ( is_wp_error( $response ) ) {
-        wp_send_json_error( $response->get_error_message() );
+        wp_send_json_error( sprintf( esc_html__( 'Connection error: %s. Please check if your AI Studio Backend is running at %s', 'ai-studio-generator' ), $response->get_error_message(), $api_url ) );
     }
 
     $status_code = wp_remote_retrieve_response_code( $response );
-    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    $body_raw = wp_remote_retrieve_body( $response );
+    $body = json_decode( $body_raw, true );
 
     if ( $status_code === 403 && isset( $body['code'] ) && $body['code'] === 'legal_consent_required' ) {
         wp_send_json_error( [
@@ -1846,11 +2291,12 @@ function aipg_ajax_sync_remote_projects() {
     }
 
     if ( $status_code >= 400 ) {
-        wp_send_json_error( $body['detail'] ?? $body['message'] ?? esc_html__( 'Failed to sync projects from API.', 'ai-studio-generator' ) );
+        $error_msg = $body['detail'] ?? $body['message'] ?? ( ! empty( $body_raw ) ? $body_raw : esc_html__( 'Failed to sync projects (HTTP ' . $status_code . ').', 'ai-studio-generator' ) );
+        wp_send_json_error( $error_msg );
     }
 
     if ( ! is_array( $body ) ) {
-        wp_send_json_error( esc_html__( 'Invalid response from API.', 'ai-studio-generator' ) );
+        wp_send_json_error( esc_html__( 'Invalid response from API. Raw body: ', 'ai-studio-generator' ) . substr( $body_raw, 0, 200 ) );
     }
 
     global $wpdb;

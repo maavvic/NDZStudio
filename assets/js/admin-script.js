@@ -80,7 +80,8 @@ jQuery(document).ready(function ($) {
                 $btn.prop('disabled', false).html(originalHtml);
                 handleLegalConsentRequired(response.data.missing, () => $('#sync-projects-btn').click());
             } else {
-                alert(aipg_vars.i18n.syncFailed + (response.data.message || response.data));
+                const errorData = (response && response.data) ? (response.data.message || response.data) : (response || 'Unknown error');
+                alert(aipg_vars.i18n.syncFailed + errorData);
                 $btn.prop('disabled', false).html(originalHtml);
             }
         }).fail(function () {
@@ -406,7 +407,8 @@ jQuery(document).ready(function ($) {
             if (response.success) {
                 reloadWithHighlight(lastGeneratedPlugin.plugin_id);
             } else {
-                alert(aipg_vars.i18n.error + (response.data.message || response.data));
+                const errorData = (response && response.data) ? (response.data.message || response.data) : (response || 'Unknown error');
+                alert(aipg_vars.i18n.error + errorData);
                 $btn.prop('disabled', false).text(originalText);
             }
         });
@@ -630,7 +632,7 @@ jQuery(document).ready(function ($) {
         navigator.clipboard.writeText(code).then(function () {
             $btn.addClass('success').find('.copy-text').text('Copied!');
             $btn.find('.dashicons').removeClass('dashicons-clipboard').addClass('dashicons-yes');
-            
+
             setTimeout(function () {
                 $btn.removeClass('success').html(originalHtml);
             }, 2000);

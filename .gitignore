@@ -39,3 +39,4 @@ aipg-prototype-*/
 # Ignore ZIP files (usually build results)
 *.zip
 *.Identifier
+*.Identifier

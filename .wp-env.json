@@ -8,6 +8,6 @@
         "WP_DEBUG": true,
         "SCRIPT_DEBUG": true
     },
-    "port": 9100,
-    "testsPort": 9101
+    "port": 9200,
+    "testsPort": 9201
 }

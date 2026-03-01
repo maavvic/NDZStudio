@@ -1,0 +1,211 @@
+/* AI Studio Editor Overlay Styles */
+.aipg-block-overlay {
+    position: absolute;
+    border: 2px solid #e67e22;
+    border-radius: 4px;
+    pointer-events: none;
+    /* Reverted to none to fix flickering */
+    z-index: 99999;
+    transition: all 0.15s ease;
+    background: rgba(230, 126, 34, 0.05);
+}
+
+.aipg-block-overlay:hover {
+    background: rgba(230, 126, 34, 0.15);
+}
+
+.aipg-block-label {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: #e67e22;
+    color: white;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    pointer-events: none;
+    /* Let overlay handle clicks */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
+}
+
+/* Compact mode for small blocks */
+.aipg-block-overlay.aipg-compact .aipg-block-label {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 14px;
+    top: 2px;
+    right: 2px;
+}
+
+.aipg-block-overlay.aipg-compact .aipg-block-label span {
+    display: none;
+}
+
+/* Pulse animation for active refinement */
+@keyframes aipgPulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.aipg-refining {
+    animation: aipgPulse 1.5s infinite ease-in-out;
+    pointer-events: none;
+}
+
+/* Modal Stylings */
+.aipg-editor-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    z-index: 100001;
+    width: 400px;
+    max-width: 90%;
+    display: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.aipg-editor-modal h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 18px;
+}
+
+.aipg-editor-modal textarea {
+    width: 100%;
+    height: 100px;
+    margin: 15px 0;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: none;
+}
+
+.aipg-editor-modal .ws-btn-primary {
+    background: #e67e22;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.aipg-editor-modal .ws-btn-secondary {
+    background: #f0f0f1;
+    color: #3c434a;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.aipg-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 100000;
+    display: none;
+}
+
+/* AI Studio Mode Toggle */
+.aipg-mode-toggle {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background: white;
+    padding: 12px 20px;
+    border-radius: 50px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    z-index: 100005;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    user-select: none;
+}
+
+.aipg-mode-toggle:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.aipg-mode-toggle.aipg-mode-ai {
+    border-color: #e67e22;
+}
+
+.aipg-toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: #e0e0e0;
+    border-radius: 20px;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.aipg-mode-ai .aipg-toggle-switch {
+    background: #e67e22;
+}
+
+.aipg-toggle-knob {
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.aipg-mode-ai .aipg-toggle-knob {
+    transform: translateX(20px);
+}
+
+.aipg-mode-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+}
+
+.aipg-mode-ai .aipg-mode-label {
+    color: #e67e22;
+}
+
+.aipg-mode-desc {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+    display: block;
+    font-weight: 400;
+}
