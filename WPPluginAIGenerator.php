@@ -1870,6 +1870,13 @@ function aipg_ajax_remove_studio_project() {
 add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
 function aipg_ajax_studio_contextual_edit() {
     check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+
+    // Allow more time for complex AI requests since GenAI timeout is 90s
+    if ( function_exists( 'set_time_limit' ) ) {
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.PHP.DiscouragedFunctions.runtime_configuration_set_time_limit
+        @set_time_limit( 240 ); 
+    }
+
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $prompt          = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
@@ -1886,7 +1893,37 @@ function aipg_ajax_studio_contextual_edit() {
     $license = get_option( 'aipg_license_key', '' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/refine-block';
 
-    error_log('[AI Studio] Refining block in post ID: ' . $post_id);
+    // --- DYNAMIC BLOCK DETECTION ---
+    $dynamic_db_block = '';
+    $dynamic_target_post_id = 0;
+    
+    // We explicitly support styling these dynamic FSE blocks via AI
+    if ( preg_match('/class="[^"]*wp-block-(post-title|site-title|site-tagline|site-logo|post-excerpt)[^"]*"/', $markup, $m) ) {
+        $block_name = 'wp:' . $m[1];
+        
+        $post = get_post($post_id);
+        $contents_to_check = [$post_id => $post->post_content];
+        
+        $template_posts = get_posts([
+            'post_type'      => ['wp_template_part', 'wp_template', 'wp_block'],
+            'posts_per_page' => -1,
+            'post_status'    => 'publish'
+        ]);
+        foreach($template_posts as $tp) {
+            $contents_to_check[$tp->ID] = $tp->post_content;
+        }
+        
+        foreach($contents_to_check as $pid => $content) {
+            // Match self-closing: <!-- wp:post-title {"foo":"bar"} /--> OR open-close
+            if ( preg_match('/<!--\s*' . preg_quote($block_name, '/') . '\b.*?(\/-->|<!--\s*\/' . preg_quote($block_name, '/') . '\s*-->)/s', $content, $match) ) {
+                $dynamic_db_block = $match[0];
+                $dynamic_target_post_id = $pid;
+                break;
+            }
+        }
+    }
+
+    error_log('[AI Studio] Refining block in post ID: ' . $post_id . ($dynamic_db_block ? ' (DYNAMIC: ' . $block_name . ')' : ''));
 
     $response = wp_remote_post( $endpoint, [
         'headers'     => [
@@ -1898,9 +1935,11 @@ function aipg_ajax_studio_contextual_edit() {
             'markup'          => $markup,
             'computed_styles' => json_decode($computed_styles, true),
             'parent_markup'   => $parent_markup,
-            'theme_config'    => get_option( 'aipg_studio_theme_config', [] )
+            'model_tier'      => 'medium',
+            'theme_config'    => get_option( 'aipg_studio_theme_config', [] ),
+            'dynamic_db_block'=> $dynamic_db_block
         ]),
-        'timeout'     => 45,
+        'timeout'     => 90,
     ]);
 
     if ( is_wp_error( $response ) ) {
@@ -1917,10 +1956,19 @@ function aipg_ajax_studio_contextual_edit() {
         wp_send_json_error( 'AI failed to refine this block.' );
     }
 
-    // 1. Try primary post content
-    $post = get_post( $post_id );
-    $new_post_content = aipg_fuzzy_block_replace( $post->post_content, $markup, $data['new_markup'] );
+    $new_post_content = '';
     $target_post_id = $post_id;
+    $post = get_post( $post_id );
+
+    if ( $dynamic_db_block && $dynamic_target_post_id ) {
+        // Direct DB replace for dynamic blocks
+        error_log('[AI Studio] Replacing DYNAMIC block directly in post ID: ' . $dynamic_target_post_id);
+        $target_post = get_post($dynamic_target_post_id);
+        $new_post_content = str_replace( $dynamic_db_block, $data['new_markup'], $target_post->post_content );
+        $target_post_id = $dynamic_target_post_id;
+    } else {
+        // 1. Try primary post content
+        $new_post_content = aipg_fuzzy_block_replace( $post->post_content, $markup, $data['new_markup'] );
     
     // 2. TEMPLATE-AWARE FALLBACK: If not found, scan all Template Parts and Templates
     if ( $new_post_content === $post->post_content ) {
@@ -1940,10 +1988,16 @@ function aipg_ajax_studio_contextual_edit() {
                 break;
             }
         }
+        }
     }
     
+    // Check if both static DB fuzzy search AND dynamic block direct replace failed
     if ( $new_post_content === $post->post_content && $target_post_id === $post_id ) {
-        error_log('[AI Studio] CRITICAL: Markup replacement failed. Block not found in DB even after template scan.');
+        if ( $dynamic_db_block && $new_post_content === $target_post->post_content ) {
+            error_log('[AI Studio] CRITICAL DYNAMIC: Direct string replacement failed.');
+        } else {
+            error_log('[AI Studio] CRITICAL: Markup replacement failed. Block not found in DB even after template scan.');
+        }
         
         $diag = [
             'search' => $markup,
@@ -1964,8 +2018,16 @@ function aipg_ajax_studio_contextual_edit() {
         'post_content' => $new_post_content
     ]);
 
+    $rendered_markup = do_blocks( $data['new_markup'] );
+    $new_styles      = '';
+    if ( class_exists( 'WP_Style_Engine' ) ) {
+        // Capture dynamic block-support CSS (Flex, Grid, Spacing) generated during render
+        $new_styles = WP_Style_Engine::get_stylesheet( 'block-supports' );
+    }
+
     wp_send_json_success([
-        'new_markup' => $data['new_markup']
+        'new_markup' => $rendered_markup,
+        'new_styles' => $new_styles
     ]);
 }
 

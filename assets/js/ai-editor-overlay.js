@@ -177,6 +177,7 @@
             if (!prompt) return;
 
             // Clean capture: recursively remove AI Studio temporary classes before sending to AI
+
             let $target = $block;
             let $targetContainer = $block;
             let isDived = false;
@@ -247,6 +248,19 @@
 
                 if (response.success) {
                     const newMarkup = response.data.new_markup;
+                    const newStyles = response.data.new_styles;
+
+                    if (newStyles) {
+                        // Inject dynamic block-support styles (Flex/Grid)
+                        const styleId = 'aipg-dynamic-block-styles';
+                        let $style = $('#' + styleId);
+                        if (!$style.length) {
+                            $style = $('<style id="' + styleId + '"></style>').appendTo('head');
+                        }
+                        // Append new styles so side-by-side (flex) classes work live
+                        $style.html(newStyles);
+                    }
+
                     const $newElement = $(newMarkup);
                     $newElement.addClass('aipg-fade-in');
 
