@@ -16,8 +16,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             pages: [],
             palette: {
                 base: [],
-                variation: [],
-                fineTuned: []
+                variation: []
             },
             template: null,
             error: null
@@ -169,39 +168,6 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 }
             },
             {
-                title: 'The Perfect Tone',
-                subtitle: 'Almost there. Pick the final refinement for your Studio.',
-                render: function () {
-                    if (!WPStudioWizard.aiFineOptions || WPStudioWizard.aiFineOptions.length === 0) {
-                        if (WPStudioWizard.data.error) {
-                            return `<div class="ws-error-container"><div class="ws-error-message">${WPStudioWizard.data.error}</div><button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="WPStudioWizard.retry()">Retry AI</button></div>`;
-                        }
-                        return '<div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Refining tones...</div>';
-                    }
-                    return `
-                        <div class="ws-palette-grid">
-                            ${WPStudioWizard.aiFineOptions.map((p, idx) => `
-                                <div class="ws-palette-card fine ${JSON.stringify(WPStudioWizard.data.palette.fineTuned) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
-                                    <div class="ws-swatch-container">
-                                        ${p.colors.map(c => `<div class="ws-swatch" style="background:${c}"></div>`).join('')}
-                                    </div>
-                                    <div class="ws-palette-label">${p.label}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                },
-                onEnter: function () {
-                    if (!WPStudioWizard.aiFineOptions || WPStudioWizard.lastVariation !== JSON.stringify(WPStudioWizard.data.palette.variation)) {
-                        WPStudioWizard.fetchAiOptions(3);
-                    }
-                },
-                validate: function () {
-                    if (WPStudioWizard.data.palette.fineTuned.length === 0) return 'Please select your final tones.';
-                    return true;
-                }
-            },
-            {
                 title: 'The Architectural Soul',
                 subtitle: 'Which structure speaks most to your vision? AI has prepared 3 bespoke concepts.',
                 render: function () {
@@ -225,13 +191,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                                             ${t.pages.map(p => `<span class="ws-page-chip" title="${p.summary}">${p.title}</span>`).join('')}
                                         </div>
                                     </div>
-                                    <div class="ws-template-actions" style="margin-top: 15px; display: none;">
-                                        <button class="ws-btn ws-btn-secondary ws-btn-sm ws-btn-preview" data-idx="${idx}">
-                                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:8px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                            Preview Prototype
+                                    <div class="ws-template-actions" style="display: none;">
+                                        <button class="ws-btn ws-btn-preview" data-idx="${idx}">
+                                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            View Website Preview
                                         </button>
-                                        <div class="ws-preview-status" style="display:none; margin-top:10px; font-size:12px; color:var(--ws-accent);">
-                                            <div class="ws-mini-spinner"></div> <span class="ws-status-text">Generating...</span>
+                                        <div class="ws-preview-status" style="display:none;">
+                                            <div class="ws-mini-spinner"></div> <span class="ws-status-text">Architecting...</span>
                                         </div>
                                     </div>
                                 </div>
@@ -255,7 +221,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 render: function () {
                     const industryMap = { business: 'Business / Company', ecommerce: 'Online Store', portfolio: 'Portfolio', blog: 'Blog', restaurant: 'Food & Drink' };
                     const styleMap = { minimal: 'Minimalist', modern: 'Modern', classic: 'Classic', bold: 'Bold & Vibrant' };
-                    const p = WPStudioWizard.data.palette.fineTuned;
+                    const p = WPStudioWizard.data.palette.variation;
                     return `
                                 <div class="ws-summary-card" style="background: rgba(0, 113, 227, 0.05); padding: 30px; border-radius: 24px; text-align: left;">
                                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 24px;">
@@ -354,12 +320,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
                 if ($this.hasClass('variation')) {
                     self.data.palette.variation = colors;
-                } else if ($this.hasClass('fine')) {
-                    self.data.palette.fineTuned = colors;
                 } else {
                     self.data.palette.base = colors;
                     self.data.palette.variation = []; // Reset sub-choices
-                    self.data.palette.fineTuned = [];
                 }
 
                 $this.parent().find('.ws-palette-card').removeClass('active');
@@ -376,6 +339,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             $(document).on('click', '.ws-btn-preview', function (e) {
                 e.stopPropagation();
                 const idx = $(this).data('idx');
+                if (idx === undefined) return;
                 const template = self.templates[idx];
                 self.generatePrototype(template, $(this).closest('.ws-template-card'));
             });
@@ -412,22 +376,90 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
         },
 
         finish: function () {
+            const self = this;
+            const template = this.data.template;
+
+            if (!template) {
+                alert('No template selected. Please go back and pick a concept.');
+                return;
+            }
+
             $('#wp-studio-wizard-root').html(`
                 <div class="aipg-wizard-loading">
                     <div class="aipg-spinner"></div>
-                    <h2 class="ws-title">Generating your Studio...</h2>
-                    <p class="ws-subtitle">Our AI is crafting a beautiful template based on your choices.</p>
+                    <h2 class="ws-title">Architecting Your Studio...</h2>
+                    <p class="ws-subtitle" id="ws-finish-status">Our AI is now crafting your multi-page website based on the "${template.name}" concept.</p>
                 </div>
             `);
 
-            // This is where we would call the AI Engine
-            console.log('Wizard Data:', this.data);
+            console.log('[Wizard] Starting Final Generation for:', template.name);
 
-            // For now, let's simulate a success and redirect to the dashboard
-            setTimeout(() => {
-                alert('Studio generated successfully! (Simulation)');
-                window.location.href = '?page=ai-generator';
-            }, 3000);
+            const payload = {
+                action: 'aipg_generate_studio_prototype',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                template_name: template.name,
+                prototype_prompt: template.prototype_prompt,
+                palette: self.data.palette.variation
+            };
+
+            $.post(ajaxurl, payload, function (res) {
+                if (res.success && res.data.status === 'COMPLETED') {
+                    $('#ws-finish-status').text('Installing your custom WordPress environment...');
+
+                    $.post(ajaxurl, {
+                        action: 'aipg_install_prototype',
+                        nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                        code: res.data.response,
+                        template_name: template.name
+                    }, function (installRes) {
+                        if (installRes.success) {
+                            self.showSuccess(installRes.data.preview_url);
+                        } else {
+                            self.showError('Installation failed: ' + installRes.data);
+                        }
+                    });
+                } else {
+                    self.showError('Generation failed. The AI engine might be busy. Please try again.');
+                }
+            }).fail(function () {
+                self.showError('Connection error during final generation.');
+            });
+        },
+
+        showSuccess: function (previewUrl) {
+            $('#wp-studio-wizard-root').html(`
+                <div class="ws-wizard-step" style="text-align:center; align-items:center;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">✨</div>
+                    <h2 class="ws-title">Your Studio is Ready!</h2>
+                    <p class="ws-subtitle">We've successfully architected and installed your multi-page website prototype.</p>
+                    
+                    <div style="margin: 40px 0; display: flex; gap: 20px;">
+                        <a href="${previewUrl}" target="_blank" class="ws-btn ws-btn-primary" style="text-decoration:none; padding: 20px 40px; font-size: 18px;">
+                            Launch Live Website
+                        </a>
+                        <a href="?page=ai-generator" class="ws-btn ws-btn-secondary" style="text-decoration:none; padding: 20px 40px; font-size: 18px;">
+                            Go to Dashboard
+                        </a>
+                    </div>
+                    
+                    <p style="color: var(--ws-text-secondary); font-size: 14px; max-width: 500px;">
+                        You can now view your website, navigate through all pages, and refine the design further from the AI Studio dashboard.
+                    </p>
+                </div>
+            `);
+            // Set progress to 100%
+            $('#ws-progress-bar').css('width', '100%');
+        },
+
+        showError: function (msg) {
+            $('#wp-studio-wizard-root').html(`
+                <div class="ws-wizard-step" style="text-align:center; align-items:center;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
+                    <h2 class="ws-title">Architecture Interrupted</h2>
+                    <p class="ws-subtitle">${msg}</p>
+                    <button class="ws-btn ws-btn-primary" onclick="location.reload()">Restart Wizard</button>
+                </div>
+            `);
         },
 
         fetchAiOptions: function (step, baseColor = null) {
@@ -435,7 +467,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const payload = {
                 step: step,
                 base_color: baseColor,
-                current_palette: step === 2 ? self.data.palette.base : (step === 3 ? self.data.palette.variation : null)
+                current_palette: step === 2 ? self.data.palette.base : null
             };
 
             if (step === 1) {
@@ -449,15 +481,11 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     $('#ai-loading-indicator').hide();
                     if (res.options && res.options.length > 0) {
                         self.data.palette.base = res.options[0].colors;
-                        self.render(); // Re-render step 3 with new AI suggested base options
+                        self.render();
                     }
                 } else if (step === 2) {
                     self.aiOptions = res.options;
                     self.lastBase = JSON.stringify(self.data.palette.base);
-                    self.render();
-                } else if (step === 3) {
-                    self.aiFineOptions = res.options;
-                    self.lastVariation = JSON.stringify(self.data.palette.variation);
                     self.render();
                 }
             }).catch(err => {
@@ -472,7 +500,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 site_name: self.data.siteName,
                 industry: self.data.industry,
                 style: self.data.style,
-                palette: self.data.palette.fineTuned
+                palette: self.data.palette.variation
             };
 
             this.data.error = null;
@@ -535,8 +563,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             }, function (res) {
                 if (res.success) {
                     $status.html(`
-                        <a href="${res.data.preview_url}" target="_blank" class="ws-btn ws-btn-primary ws-btn-sm" style="margin-top:5px; width:100%; text-decoration:none; display:inline-block; text-align:center;">
-                            View Live Prototype
+                        <a href="${res.data.preview_url}" target="_blank" class="ws-btn ws-btn-primary ws-btn-launch" style="text-decoration:none;">
+                            Launch Live Preview
                         </a>
                     `);
                 } else {
