@@ -1893,37 +1893,57 @@ function aipg_ajax_studio_contextual_edit() {
     $license = get_option( 'aipg_license_key', '' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/refine-block';
 
-    // --- DYNAMIC BLOCK DETECTION ---
-    $dynamic_db_block = '';
-    $dynamic_target_post_id = 0;
+    // --- BLOCK GRAMMAR DETECTION ---
+    $matched_block_node = null;
+    $target_post_id = $post_id;
+    $is_new_template = false;
+    $full_parsed_tree = [];
+    $active_template = null;
+
+    global $post;
+    $post = get_post($post_id);
+    setup_postdata($post);
     
-    // We explicitly support styling these dynamic FSE blocks via AI
-    if ( preg_match('/class="[^"]*wp-block-(post-title|site-title|site-tagline|site-logo|post-excerpt)[^"]*"/', $markup, $m) ) {
-        $block_name = 'wp:' . $m[1];
+    $search_debug_log = [];
+
+    // 1. Check primary post first
+    $full_parsed_tree = parse_blocks( $post->post_content );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $markup, $search_debug_log );
+
+    // 2. Scan all Block Templates if not found in primary post
+    if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $templates = array_merge( 
+            get_block_templates( array(), 'wp_template' ), 
+            get_block_templates( array(), 'wp_template_part' ) 
+        );
         
-        $post = get_post($post_id);
-        $contents_to_check = [$post_id => $post->post_content];
-        
-        $template_posts = get_posts([
-            'post_type'      => ['wp_template_part', 'wp_template', 'wp_block'],
-            'posts_per_page' => -1,
-            'post_status'    => 'publish'
-        ]);
-        foreach($template_posts as $tp) {
-            $contents_to_check[$tp->ID] = $tp->post_content;
-        }
-        
-        foreach($contents_to_check as $pid => $content) {
-            // Match self-closing: <!-- wp:post-title {"foo":"bar"} /--> OR open-close
-            if ( preg_match('/<!--\s*' . preg_quote($block_name, '/') . '\b.*?(\/-->|<!--\s*\/' . preg_quote($block_name, '/') . '\s*-->)/s', $content, $match) ) {
-                $dynamic_db_block = $match[0];
-                $dynamic_target_post_id = $pid;
+        foreach($templates as $t) {
+            $test_tree = parse_blocks( $t->content );
+            $match = aipg_find_block_in_tree( $test_tree, $markup, $search_debug_log );
+            if ( $match ) {
+                $matched_block_node = $match;
+                $full_parsed_tree = $test_tree;
+                $active_template = $t;
                 break;
             }
         }
     }
+    
+    wp_reset_postdata();
 
-    error_log('[AI Studio] Refining block in post ID: ' . $post_id . ($dynamic_db_block ? ' (DYNAMIC: ' . $block_name . ')' : ''));
+    if ( ! $matched_block_node ) {
+        error_log('[AI Studio] Block NOT FOUND in post ID: ' . $post_id . ' or its templates.');
+        wp_send_json_error( [
+            'message' => 'Could not accurately identify the block in the database for replacement.',
+            'diagnostics' => [
+                'search' => $markup,
+                'scan_log' => array_slice($search_debug_log, 0, 100)
+            ]
+        ] );
+    }
+
+    $serialized_target_block = serialize_blocks([$matched_block_node]);
+    error_log('[AI Studio] Found Block Grammar. Size: ' . strlen($serialized_target_block));
 
     $response = wp_remote_post( $endpoint, [
         'headers'     => [
@@ -1932,12 +1952,12 @@ function aipg_ajax_studio_contextual_edit() {
         ],
         'body'        => wp_json_encode([
             'prompt'          => $prompt,
-            'markup'          => $markup,
+            'markup'          => $markup, // Keep for context
             'computed_styles' => json_decode($computed_styles, true),
             'parent_markup'   => $parent_markup,
             'model_tier'      => 'medium',
             'theme_config'    => get_option( 'aipg_studio_theme_config', [] ),
-            'dynamic_db_block'=> $dynamic_db_block
+            'dynamic_db_block'=> $serialized_target_block, // Hijacking this variable name to mean "Block Grammar Mode"
         ]),
         'timeout'     => 120,
     ]);
@@ -1948,71 +1968,56 @@ function aipg_ajax_studio_contextual_edit() {
     }
 
     $body = wp_remote_retrieve_body( $response );
-    error_log('[AI Studio] Refinement RAW Response (partial): ' . substr($body, 0, 1000));
-
     $data = json_decode( $body, true );
+    
     if ( ! $data || ! isset( $data['new_markup'] ) ) {
         error_log('[AI Studio] Refinement Parse Error or missing new_markup');
         wp_send_json_error( 'AI failed to refine this block.' );
     }
 
     try {
-        $new_post_content = '';
-        $target_post_id = $post_id;
-        $post = get_post( $post_id );
+        // The API returns the mutated Node Grammar in 'new_markup'
+        $new_block_grammar = $data['new_markup'];
+        
+        // Replace the node in the tree
+        $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
+        
+        // Re-serialize the entire page / template
+        $new_post_content = serialize_blocks( $updated_tree );
 
-        if ( $dynamic_db_block && $dynamic_target_post_id ) {
-            // Direct DB replace for dynamic blocks
-            $target_post = get_post($dynamic_target_post_id);
-            $new_post_content = str_replace( $dynamic_db_block, $data['new_markup'], $target_post->post_content );
-            $target_post_id = $dynamic_target_post_id;
-        } else {
-            // 1. Try primary post content
-            $new_post_content = aipg_fuzzy_block_replace( $post->post_content, $markup, $data['new_markup'] );
-            
-            // 2. TEMPLATE-AWARE FALLBACK: If not found, scan all Template Parts and Templates
-            if ( $new_post_content === $post->post_content ) {
-                $template_posts = get_posts([
-                    'post_type'      => ['wp_template_part', 'wp_template', 'wp_block', 'wp_navigation'],
-                    'posts_per_page' => -1,
-                    'post_status'    => 'publish'
-                ]);
-
-                foreach ( $template_posts as $t_post ) {
-                    $test_content = aipg_fuzzy_block_replace( $t_post->post_content, $markup, $data['new_markup'] );
-                    if ( $test_content !== $t_post->post_content ) {
-                        $new_post_content = $test_content;
-                        $target_post_id = $t_post->ID;
-                        break;
-                    }
-                }
+        // Determine save location
+        if ( $active_template ) {
+            if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
+                error_log('[AI Studio] Creating DB override for theme template: ' . $active_template->slug);
+                $is_new_template = true;
+                $target_post_id = wp_insert_post( [
+                    'post_content' => wp_slash( $new_post_content ),
+                    'post_name'    => $active_template->slug,
+                    'post_title'   => $active_template->title,
+                    'post_type'    => $active_template->type,
+                    'post_status'  => 'publish',
+                    'tax_input'    => [
+                        'wp_theme' => [ $active_template->theme ]
+                    ]
+                ] );
+                wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+            } else {
+                $target_post_id = $active_template->wp_id;
             }
         }
-        
-        // Check if both static DB fuzzy search AND dynamic block direct replace failed
-        if ( $new_post_content === $post->post_content && $target_post_id === $post_id ) {
-            $diag = [
-                'search' => $markup,
-                'skeleton_regex' => aipg_get_markup_skeleton_regex( $markup ),
-                'db_sample' => substr($post->post_content, 0, 5000),
-                'post_id' => $post_id,
-            ];
-            
-            wp_send_json_error( [
-                'message' => 'Could not find the block in current page or global templates to replace it.',
-                'diagnostics' => $diag
-            ] );
+
+        if ( ! $is_new_template ) {
+            wp_update_post([
+                'ID'           => $target_post_id,
+                'post_content' => wp_slash( $new_post_content )
+            ]);
         }
 
-        wp_update_post([
-            'ID'           => $target_post_id,
-            'post_content' => $new_post_content
-        ]);
-
-        $rendered_markup = do_blocks( $data['new_markup'] );
-        $new_styles      = '';
+        // Render just the newly designed block to return to the frontend
+        $rendered_markup = do_blocks( $new_block_grammar );
+        
+        $new_styles = '';
         if ( function_exists( 'wp_style_engine_get_stylesheet_from_context' ) ) {
-            // Capture dynamic block-support CSS (Flex, Grid, Spacing) generated during render
             $new_styles = wp_style_engine_get_stylesheet_from_context( 'block-supports' );
         }
 
@@ -2027,110 +2032,77 @@ function aipg_ajax_studio_contextual_edit() {
 }
 
 /**
- * Robustly replace a block in post content.
- * Handles slight variations in whitespace or attributes between rendered DOM and DB.
+ * Recursively search a tree of parsed WordPress blocks to find the one that 
+ * renders out to the specific HTML payload sent from the frontend overlay.
+ * 
+ * @param array $parsed_blocks Array of blocks from parse_blocks()
+ * @param string $target_html The HTML markup clicked by the user
+ * @param array &$debug_log Pass by reference array to collect scanning info
+ * @return array|null The matched block array, or null if not found
  */
-function aipg_fuzzy_block_replace( $content, $search, $replace ) {
-    // 2. Exact match check
-    if ( strpos( $content, $search ) !== false ) {
-        return str_replace( $search, $replace, $content );
-    }
+function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = [] ) {
+    if ( empty( $parsed_blocks ) ) return null;
 
-    // 2.5 Multi-block fallback: If search contains multiple top-level blocks
-    // and we can't find them together, they might be separated by different newlines in DB.
-    if ( preg_match_all('/<([a-z0-9]+)[^>]*>.*?<\/\\1>/is', $search, $matches) ) {
-        if (count($matches[0]) > 1) {
-            error_log('[AI Studio] Multi-block search detected. Trying flexible join...');
-            $parts = [];
-            foreach($matches[0] as $m) $parts[] = preg_quote(trim($m), '/');
-            $multi_regex = implode('(\s*|<!--.*?-->)*', $parts);
-            $multi_replaced = preg_replace("/$multi_regex/is", $replace, $content, 1);
-            if ($multi_replaced !== null && $multi_replaced !== $content) {
-                error_log('[AI Studio] SUCCESS: Multi-block match found.');
-                return $multi_replaced;
-            }
-        }
-    }
+    $norm_target = preg_replace( '/\s+/', ' ', trim($target_html) );
 
-    // 2. Normalized whitespace match
-    // Browsers often change \n or spaces. Normalize both to single spaces for comparison.
-    $norm_content = preg_replace( '/\s+/', ' ', $content );
-    $norm_search  = preg_replace( '/\s+/', ' ', $search );
+    foreach ( $parsed_blocks as $block ) {
+        if ( empty( $block['blockName'] ) ) continue;
 
-    if ( strpos( $norm_content, $norm_search ) !== false ) {
-        error_log('[AI Studio] Fuzzy match found via whitespace normalization.');
+        $rendered = render_block( $block );
+        $norm_rendered = preg_replace( '/\s+/', ' ', trim($rendered) );
+
+        $fingerprint_rendered = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_rendered);
+        $fingerprint_target   = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_target);
         
-        $quoted_search = preg_quote( $norm_search, '/' );
-        $regex_search  = preg_replace( '/\s+/', '\s+', $quoted_search );
-        
-        $replaced = preg_replace( "/$regex_search/s", $replace, $content, 1 );
-        if ( $replaced !== null && $replaced !== $content ) {
-            return $replaced;
+        $debug_log[] = [
+            'blockName' => $block['blockName'],
+            'rendered_fingerprint' => $fingerprint_rendered,
+            'target_fingerprint' => $fingerprint_target
+        ];
+
+        // 1. Recurse into InnerBlocks FIRST (Bottom-up traversal)
+        // This ensures if a user clicks a title inside a group, we return the title, not the whole group.
+        if ( ! empty( $block['innerBlocks'] ) ) {
+            $found_inside = aipg_find_block_in_tree( $block['innerBlocks'], $target_html, $debug_log );
+            if ( $found_inside ) return $found_inside;
         }
+
+        // 2. Direct match
+        if ( strpos( $norm_rendered, $norm_target ) !== false ) return $block;
+        
+        // 3. Fallback: Structural check
+        if ( strpos( $fingerprint_rendered, $fingerprint_target ) !== false ) return $block;
     }
 
-    // 3. Skeleton match (Ultimate fallback)
-    // Create a regex that ignores all attributes and focuses on tag structure + text
-    error_log('[AI Studio] Attempting Skeleton-based matching...');
-    $skeleton_regex = aipg_get_markup_skeleton_regex( $search );
-    
-    $replaced = preg_replace( "/$skeleton_regex/s", $replace, $content, 1 );
-    if ( $replaced !== null && $replaced !== $content ) {
-        error_log('[AI Studio] SUCCESS: Match found via Skeleton Regex.');
-        return $replaced;
-    }
-
-    // 4. Last resort: Log details for debugging
-    error_log('[AI Studio] Block replacement FAILED after all attempts.');
-    return $content;
+    return null;
 }
 
 /**
- * Generates a regex that matches the tag structure and text content of HTML,
- * ignoring all attributes.
+ * A helper to reconstruct the WP block tree after the AI returns a styled node
+ * 
+ * @param array $parsed_blocks The original tree
+ * @param array $original_node The old node to find
+ * @param string $new_serialized_node The new serialized string to inject
+ * @return array The updated tree of blocks
  */
-function aipg_get_markup_skeleton_regex( $html ) {
-    // 1. Clean HTML: Remove comments and normalize
-    $html = preg_replace('/<!--\s+\/?wp:.*?-->/s', '', $html);
-    
-    // 2. Placeholder-ize tags to avoid preg_quote mess
-    $tags = [];
-    $html = preg_replace_callback('/<([a-z0-9]+)[^>]*>/i', function($m) use (&$tags) {
-        $id = count($tags);
-        $tags[$id] = $m[1];
-        return " __TAGSTART{$id}__ ";
-    }, $html);
-    
-    $html = preg_replace_callback('/<\/([a-z0-9]+)>/i', function($m) use (&$tags) {
-        $id = count($tags);
-        $tags[$id] = "CLOSE_" . $m[1];
-        return " __TAGEND{$id}__ ";
-    }, $html);
+function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_serialized_node ) {
+    $new_parsed = parse_blocks( $new_serialized_node );
+    $replacement = !empty($new_parsed[0]) ? $new_parsed[0] : null;
 
-    // 3. Escape the remaining text content
-    $regex = preg_quote( trim($html), '/' );
-    
-    // 4. Transform placeholders back to flexible regex patterns
-    foreach ($tags as $id => $type) {
-        if (strpos($type, 'CLOSE_') === 0) {
-            $tag_name = substr($type, 6);
-            $regex = str_replace("__TAGEND{$id}__", "<\/($tag_name)>", $regex);
-        } else {
-            $regex = str_replace("__TAGSTART{$id}__", "<($type)[^>]*>", $regex);
+    if ( ! $replacement ) return $parsed_blocks;
+
+    foreach ( $parsed_blocks as $k => $block ) {
+        if ( $block === $original_node ) {
+            $parsed_blocks[$k] = $replacement;
+            return $parsed_blocks;
+        }
+        
+        if ( ! empty( $block['innerBlocks'] ) ) {
+            $parsed_blocks[$k]['innerBlocks'] = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_serialized_node );
         }
     }
-
-    // 5. CRITICAL: Normalize all whitespace AND allow Gutenberg comments/newlines
-    $regex = preg_replace( '/\s+/', '(\s*|<!--.*?-->)*', $regex );
     
-    // 6. Final Clean-up: Remove brittle escapes from preg_quote that we want to be literal
-    // This removes escapes from - : . and other symbols that preg_quote adds but we want clean
-    $regex = str_replace(['\\-', '\\:', '\\.', '\\ ', '\\(', '\\)', '\\,', '\\!', '\\?'], ['-', ':', '.', '(\s*|<!--.*?-->)*', '\(', '\)', ',', '!', '?'], $regex);
-    
-    // Ensure actual tag starts/ends are NOT double escaped
-    $regex = str_replace(['\\<', '\\>'], ['<', '>'], $regex);
-
-    return $regex;
+    return $parsed_blocks;
 }
 
 
