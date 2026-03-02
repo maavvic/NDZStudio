@@ -59,6 +59,13 @@
                 if (!self.aiEnabled || self.isEditing) return;
                 const $el = $(this);
 
+                const isGlobalWrapper = $el.is('body, main, header, footer, nav, .wp-site-blocks, .is-root-container, .wp-block-post-content');
+                if (isGlobalWrapper) {
+                    // Ignore hover for structural high-level wrappers
+                    self.$overlay.hide();
+                    return;
+                }
+
                 // Stop propagation so we pick the innermost block when hovering specifically,
                 // BUT we allow the user to reach outer blocks if they hover on their edges.
                 e.stopPropagation();
@@ -219,12 +226,20 @@
             // Context capturing: Isolate parent context by replacing selected block with a placeholder
             const computedStyles = this.getComputedStyles($block);
             let parentMarkup = '';
-            if ($block.parent().length) {
-                const $parentClone = $block.parent().clone();
-                // Find the index of the current block in its parent to replace it accurately in the clone
-                const blockIndex = $block.index();
-                $parentClone.children().eq(blockIndex).replaceWith('[SELECTED_BLOCK_HERE]');
-                parentMarkup = $parentClone[0].outerHTML.substring(0, 4000);
+
+            // Get up to 2 levels of parents for better visual context
+            let $contextWrapper = $block.parent();
+            if ($contextWrapper.length) {
+                if ($contextWrapper.parent().length && !$contextWrapper.parent().is('body, html')) {
+                    $contextWrapper = $contextWrapper.parent();
+                }
+                // Mark the target inside original to find it in clone
+                $block.addClass('aipg-temp-target-marker');
+                const $cloneToProcess = $contextWrapper.clone();
+                $block.removeClass('aipg-temp-target-marker');
+
+                $cloneToProcess.find('.aipg-temp-target-marker').replaceWith('[TARGET_BLOCK_TO_REPLACE_HERE]');
+                parentMarkup = $cloneToProcess[0].outerHTML.substring(0, 6000); // Send more context
             }
 
             $btn.text('AI is thinking...').prop('disabled', true);
@@ -243,48 +258,73 @@
                 post_id: aipg_editor_vars.post_id
             };
 
-            $.post(aipg_editor_vars.ajaxurl, payload, function (response) {
-                $block.removeClass('aipg-refining');
+            $.ajax({
+                url: aipg_editor_vars.ajaxurl,
+                type: 'POST',
+                data: payload,
+                timeout: 120000, // 2 minutes for slow Pro models
+                success: function (response) {
+                    $block.removeClass('aipg-refining');
 
-                if (response.success) {
-                    const newMarkup = response.data.new_markup;
-                    const newStyles = response.data.new_styles;
+                    if (response.success) {
+                        const newMarkup = response.data.new_markup;
+                        const newStyles = response.data.new_styles;
 
-                    if (newStyles) {
-                        // Inject dynamic block-support styles (Flex/Grid)
-                        const styleId = 'aipg-dynamic-block-styles';
-                        let $style = $('#' + styleId);
-                        if (!$style.length) {
-                            $style = $('<style id="' + styleId + '"></style>').appendTo('head');
+                        if (newStyles) {
+                            // Inject dynamic block-support styles (Flex/Grid)
+                            const styleId = 'aipg-dynamic-block-styles';
+                            let $style = $('#' + styleId);
+                            if (!$style.length) {
+                                $style = $('<style id="' + styleId + '"></style>').appendTo('head');
+                            }
+                            // Append new styles so side-by-side (flex) classes work live
+                            $style.html(newStyles);
                         }
-                        // Append new styles so side-by-side (flex) classes work live
-                        $style.html(newStyles);
-                    }
 
-                    const $newElement = $(newMarkup);
-                    $newElement.addClass('aipg-fade-in');
+                        let $newElement = $(newMarkup);
+                        $newElement.addClass('aipg-fade-in');
 
-                    if (isDived) {
-                        // Update the inner content of the specific content area (preserves title/wrappers)
-                        $targetContainer.html($newElement);
+                        if (isDived) {
+                            // Update the inner content of the specific content area (preserves title/wrappers)
+                            $targetContainer.html($newElement);
+                        } else {
+                            // Standard block replacement
+                            // Fallback for Dynamic Blocks like Template Parts that render as pure HTML
+                            // and might lose their jQuery bindings or structural wrapper
+                            if ($block.is('footer, header, main, .wp-block-template-part')) {
+                                // If the original was a structural tag and the new element is multiple nodes
+                                // or a generic div, we need to carefully replace the inner HTML or 
+                                // wrap it to preserve Layout
+                                if ($newElement.length > 1 || !$newElement.is($block.prop('tagName'))) {
+                                    $block.html($newElement);
+                                    $block.addClass('aipg-fade-in');
+                                } else {
+                                    $block.replaceWith($newElement);
+                                }
+                            } else {
+                                $block.replaceWith($newElement);
+                            }
+                        }
+                        $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
                     } else {
-                        // Standard block replacement
-                        $block.replaceWith($newElement);
+                        const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
+                        if (response.data && response.data.diagnostics) {
+                            console.error('[AI Studio] Refinement Diagnostics:', response.data.diagnostics);
+                        }
+                        alert('AI Refinement Error: ' + errorMsg);
+                        $btn.text('Try Again').prop('disabled', false);
                     }
-                    $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
-                } else {
-                    const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
-                    if (response.data && response.data.diagnostics) {
-                        console.error('[AI Studio] Refinement Diagnostics:', response.data.diagnostics);
+                },
+                error: function (xhr, status, error) {
+                    $block.removeClass('aipg-refining');
+                    let errMsg = 'Server error while refining block.';
+                    if (status === 'timeout') {
+                        errMsg = 'The AI took too long to respond (timeout). Please try a simpler request.';
                     }
-                    alert('AI Refinement Error: ' + errorMsg);
+                    alert(errMsg);
+                    console.error('[AI Studio] Request Error:', status, error, xhr);
                     $btn.text('Try Again').prop('disabled', false);
                 }
-            }).fail((xhr) => {
-                $block.removeClass('aipg-refining');
-                alert('Server error while refining block.');
-                console.error('[AI Studio] Request Error:', xhr);
-                $btn.text('Try Again').prop('disabled', false);
             });
         }
     };

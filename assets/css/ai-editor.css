@@ -8,10 +8,37 @@
     z-index: 99999;
     transition: all 0.15s ease;
     background: rgba(230, 126, 34, 0.05);
+
+    /* Flexbox centering for the hint text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .aipg-block-overlay:hover {
     background: rgba(230, 126, 34, 0.15);
+}
+
+/* Subtle 'Click to edit' hint */
+.aipg-block-overlay:hover::after {
+    content: "Click to edit";
+    color: rgba(230, 126, 34, 0.8);
+    background: rgba(255, 255, 255, 0.85);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.2s ease;
+    opacity: 0.9;
+}
+
+/* Hide the hint on very small blocks */
+.aipg-block-overlay.aipg-compact:hover::after {
+    display: none;
 }
 
 .aipg-block-label {
