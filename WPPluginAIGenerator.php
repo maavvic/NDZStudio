@@ -1916,6 +1916,24 @@ function aipg_ajax_studio_contextual_edit() {
             get_block_templates( array(), 'wp_template' ), 
             get_block_templates( array(), 'wp_template_part' ) 
         );
+
+        // Sort FSE templates so the most specific templates for this post type are checked first
+        usort($templates, function($a, $b) use ($post) {
+            $scoreA = 0; $scoreB = 0;
+            
+            if ($post->post_type === 'page') {
+                if (in_array($a->slug, ['page', 'front-page', 'singular'])) $scoreA += 10;
+                if (in_array($b->slug, ['page', 'front-page', 'singular'])) $scoreB += 10;
+            } elseif ($post->post_type === 'post') {
+                if (in_array($a->slug, ['single', 'singular'])) $scoreA += 10;
+                if (in_array($b->slug, ['single', 'singular'])) $scoreB += 10;
+            }
+
+            if ($a->slug === 'index') $scoreA += 5;
+            if ($b->slug === 'index') $scoreB += 5;
+
+            return $scoreB <=> $scoreA;
+        });
         
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
@@ -1982,11 +2000,23 @@ function aipg_ajax_studio_contextual_edit() {
         // Replace the node in the tree
         $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
         
+        if ( $updated_tree === $full_parsed_tree ) {
+            $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
+            error_log($err_msg);
+            file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err_msg, FILE_APPEND);
+        } else {
+            error_log('[AI Studio] SUCCESS: Tree successfully mutated.');
+            file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - SUCCESS: Tree successfully mutated.\n", FILE_APPEND);
+        }
+
         // Re-serialize the entire page / template
         $new_post_content = serialize_blocks( $updated_tree );
+        
+        $db_diagnostics = [];
 
         // Determine save location
         if ( $active_template ) {
+            $db_diagnostics[] = "Matched Template Slug: " . $active_template->slug;
             if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
                 error_log('[AI Studio] Creating DB override for theme template: ' . $active_template->slug);
                 $is_new_template = true;
@@ -1996,21 +2026,38 @@ function aipg_ajax_studio_contextual_edit() {
                     'post_title'   => $active_template->title,
                     'post_type'    => $active_template->type,
                     'post_status'  => 'publish',
-                    'tax_input'    => [
-                        'wp_theme' => [ $active_template->theme ]
-                    ]
                 ] );
-                wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+                if ( is_wp_error( $target_post_id ) ) {
+                    $err = $target_post_id->get_error_message();
+                    error_log('[AI Studio] ERROR creating template: ' . $err);
+                    $db_diagnostics[] = "Insert Error: $err";
+                } else {
+                    $term_res = wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+                    $term_msg = is_wp_error($term_res) ? $term_res->get_error_message() : json_encode($term_res);
+                    error_log('[AI Studio] Created template override ID: ' . $target_post_id . '. Term Status: ' . $term_msg);
+                    $db_diagnostics[] = "Inserted ID: $target_post_id. Terms: $term_msg";
+                }
             } else {
                 $target_post_id = $active_template->wp_id;
+                $db_diagnostics[] = "Using existing active_template ID: $target_post_id";
             }
+        } else {
+            $db_diagnostics[] = "No active_template, updating original post ID: $target_post_id";
         }
 
         if ( ! $is_new_template ) {
-            wp_update_post([
+            $update_res = wp_update_post([
                 'ID'           => $target_post_id,
                 'post_content' => wp_slash( $new_post_content )
             ]);
+            if ( is_wp_error( $update_res ) ) {
+                $err = $update_res->get_error_message();
+                error_log('[AI Studio] ERROR updating post/template: ' . $err);
+                $db_diagnostics[] = "Update Error: $err";
+            } else {
+                error_log('[AI Studio] Successfully updated post/template ID: ' . $update_res);
+                $db_diagnostics[] = "Updated ID: $update_res";
+            }
         }
 
         // Render just the newly designed block to return to the frontend
@@ -2021,12 +2068,19 @@ function aipg_ajax_studio_contextual_edit() {
             $new_styles = wp_style_engine_get_stylesheet_from_context( 'block-supports' );
         }
 
+        // Log everything to file
+        file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - DB Diags: " . json_encode($db_diagnostics) . "\n", FILE_APPEND);
+
         wp_send_json_success([
             'new_markup' => $rendered_markup,
-            'new_styles' => $new_styles
+            'new_styles' => $new_styles,
+            'db_diagnostics' => $db_diagnostics,
+            'tree_mutated' => ($updated_tree !== $full_parsed_tree)
         ]);
     } catch ( \Throwable $e ) {
-        error_log( '[AI Studio] FATAL ERROR during replacement: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
+        $err = '[AI Studio] FATAL ERROR during replacement: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+        error_log( $err );
+        file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err . "\n", FILE_APPEND);
         wp_send_json_error( 'Fatal error processing replacement: ' . $e->getMessage() );
     }
 }
