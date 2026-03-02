@@ -32,7 +32,17 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             <label class="ws-label">Website Name</label>
                             <input type="text" id="ws-site-name" class="ws-input" placeholder="e.g. My Awesome Bakery" value="${WPStudioWizard.data.siteName}">
                         </div>
+
+                        <div id="ws-recent-projects-area" style="margin-top: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 30px;">
+                            <h3 class="ws-mini-title" style="margin-bottom:20px; font-size: 16px; font-weight: 600;">Resume Your Projects</h3>
+                            <div id="ws-recent-projects-list">
+                                <div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Looking for saved designs...</div>
+                            </div>
+                        </div>
                     `;
+                },
+                onEnter: function () {
+                    WPStudioWizard.fetchRecentProjects();
                 },
                 validate: function () {
                     const val = $('#ws-site-name').val().trim();
@@ -138,16 +148,17 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 title: 'Atmospheric Variations',
                 subtitle: 'Fine-tune the mood. Which variation feels most authentic?',
                 render: function () {
-                    if (!WPStudioWizard.aiOptions || WPStudioWizard.aiOptions.length === 0) {
-                        if (WPStudioWizard.data.error) {
-                            return `<div class="ws-error-container"><div class="ws-error-message">${WPStudioWizard.data.error}</div><button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="WPStudioWizard.retry()">Retry AI</button></div>`;
+                    const self = WPStudioWizard;
+                    if (!self.aiOptions || self.aiOptions.length === 0) {
+                        if (self.data.error) {
+                            return `<div class="ws-error-container"><div class="ws-error-message">${self.data.error}</div><button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="WPStudioWizard.retry()">Retry AI</button></div>`;
                         }
                         return '<div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Loading variations...</div>';
                     }
                     return `
                         <div class="ws-palette-grid">
-                            ${WPStudioWizard.aiOptions.map((p, idx) => `
-                                <div class="ws-palette-card variation ${JSON.stringify(WPStudioWizard.data.palette.variation) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
+                            ${self.aiOptions.map((p, idx) => `
+                                <div class="ws-palette-card variation ${JSON.stringify(self.data.palette.variation) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
                                     <div class="ws-swatch-container">
                                         ${p.colors.map(c => `<div class="ws-swatch" style="background:${c}"></div>`).join('')}
                                     </div>
@@ -158,8 +169,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     `;
                 },
                 onEnter: function () {
-                    if (!WPStudioWizard.aiOptions || WPStudioWizard.lastBase !== JSON.stringify(WPStudioWizard.data.palette.base)) {
-                        WPStudioWizard.fetchAiOptions(2);
+                    const self = WPStudioWizard;
+                    if (self.isFetching) return;
+                    if (!self.aiOptions || self.lastBase !== JSON.stringify(self.data.palette.base)) {
+                        self.fetchAiOptions(2);
                     }
                 },
                 validate: function () {
@@ -210,8 +223,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     `;
                 },
                 onEnter: function () {
-                    if (!WPStudioWizard.templates) {
-                        WPStudioWizard.fetchTemplates();
+                    const self = WPStudioWizard;
+                    if (self.isFetching) return;
+                    if (!self.templates) {
+                        self.fetchTemplates();
                     }
                 },
                 validate: function () {
@@ -259,10 +274,24 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
         init: function () {
             try {
                 console.log('%c[Wizard] Init Started. currentStep: ' + this.currentStep, 'color: #0071e3; font-weight: bold;');
-                this.render();
+                this.goToStep(0);
                 this.bindEvents();
             } catch (e) {
                 console.error('%c[Wizard Init Error]', 'color: white; background: red; padding: 5px;', e);
+            }
+        },
+
+        goToStep: function (stepIdx) {
+            this.currentStep = stepIdx;
+            const step = this.steps[this.currentStep];
+            console.log(`[Wizard] Moving to Step: ${this.currentStep} -> ${step.title}`);
+
+            // Render first to show loading state if needed
+            this.render();
+
+            if (step.onEnter) {
+                console.log(`%c[Wizard] Executing onEnter for Step: ${this.currentStep}`, 'color: #8e44ad; font-weight: bold;');
+                step.onEnter();
             }
         },
 
@@ -271,11 +300,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const isLast = this.currentStep === this.steps.length - 1;
             const progress = ((this.currentStep + 1) / this.steps.length) * 100;
 
-            console.log(`[Wizard] Rendering Step: ${this.currentStep} -> ${step.title}`);
-            if (step.onEnter) {
-                console.log(`%c[Wizard] Executing onEnter for Step: ${this.currentStep}`, 'color: #8e44ad; font-weight: bold;');
-                step.onEnter();
-            }
+            console.log(`[Wizard] Rendering UI for Step: ${this.currentStep}`);
 
             const html = `
                 <div class="ws-wizard-step" key="${this.currentStep}">
@@ -372,8 +397,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 }
 
                 if (self.currentStep < self.steps.length - 1) {
-                    self.currentStep++;
-                    self.render();
+                    self.goToStep(self.currentStep + 1);
                 } else {
                     self.finish();
                 }
@@ -381,8 +405,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
             $(document).on('click', '#ws-prev', function () {
                 if (self.currentStep > 0) {
-                    self.currentStep--;
-                    self.render();
+                    self.goToStep(self.currentStep - 1);
                 }
             });
 
@@ -407,6 +430,21 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 const pjId = $(this).data('id');
                 if (confirm('Are you sure? This will permanently delete all pages and content for this project.')) {
                     self.removeProject(pjId);
+                }
+            });
+
+            // Load Saved Project Snapshot
+            $(document).on('click', '.ws-btn-load-project', function () {
+                const id = $(this).data('id');
+                self.loadProject(id);
+            });
+
+            // Delete Saved Project Snapshot
+            $(document).on('click', '.ws-btn-delete-project', function (e) {
+                e.stopPropagation();
+                const id = $(this).data('id');
+                if (confirm('Permanently delete this saved version?')) {
+                    self.deleteProject(id);
                 }
             });
         },
@@ -455,10 +493,15 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         }
                     });
                 } else {
-                    self.showError('Generation failed. The AI engine might be busy. Please try again.');
+                    const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
+                    self.showError('Generation failed: ' + errorMsg + ' Please try again in 30 seconds.');
                 }
-            }).fail(function () {
-                self.showError('Connection error during final generation.');
+            }).fail(function (jqXHR) {
+                const status = jqXHR.status;
+                let msg = 'Connection error during final generation.';
+                if (status === 0) msg += ' (Check if your backend is running at http://localhost:8000)';
+                if (status === 504) msg += ' (Gateway Timeout - The AI took too long)';
+                self.showError(msg);
             });
         },
 
@@ -469,12 +512,12 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     <h2 class="ws-title">Your Studio is Ready!</h2>
                     <p class="ws-subtitle">We've successfully architected and installed your multi-page website prototype.</p>
                     
-                    <div style="margin: 40px 0; display: flex; gap: 20px;">
-                        <a href="${previewUrl}" target="_blank" class="ws-btn ws-btn-primary" style="text-decoration:none; padding: 20px 40px; font-size: 18px;">
-                            Launch Live Website
+                    <div style="margin: 40px 0; display: flex; gap: 20px; justify-content: center;">
+                        <a href="${previewUrl}" target="_blank" class="ws-btn ws-btn-primary" style="text-decoration:none; padding: 15px 30px;">
+                            Launch Website
                         </a>
-                        <a href="?page=ai-generator" class="ws-btn ws-btn-secondary" style="text-decoration:none; padding: 20px 40px; font-size: 18px;">
-                            Go to Dashboard
+                        <a href="?page=nodevzone" class="ws-btn ws-btn-secondary" style="text-decoration:none; padding: 15px 30px;">
+                            Close & View Projects
                         </a>
                     </div>
                     
@@ -500,6 +543,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
         fetchAiOptions: function (step, baseColor = null) {
             const self = this;
+            if (this.isFetching) return;
+            this.isFetching = true;
+
             const payload = {
                 step: step,
                 base_color: baseColor,
@@ -524,14 +570,21 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     self.lastBase = JSON.stringify(self.data.palette.base);
                     self.render();
                 }
+                self.isFetching = false;
             }).catch(err => {
-                console.error('AI Error:', err);
+                console.error('AI Color Error:', err);
+                self.data.error = "The AI failed to generate color variations. Please try again or select a palette manually.";
                 if (step === 1) $('#ai-loading-indicator').hide();
+                self.isFetching = false;
+                self.render();
             });
         },
 
         fetchTemplates: function () {
             const self = this;
+            if (this.isFetching) return;
+            this.isFetching = true;
+
             const payload = {
                 site_name: self.data.siteName,
                 industry: self.data.industry,
@@ -542,10 +595,12 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             this.data.error = null;
             this.callAiStudio('suggest-templates', payload).then(res => {
                 self.templates = res.templates || [];
+                self.isFetching = false;
                 self.render();
             }).catch(err => {
                 console.error('Template Fetch Error:', err);
                 self.data.error = "The AI failed to architect your templates. This might be a temporary connection issue.";
+                self.isFetching = false;
                 self.render();
             });
         },
@@ -573,15 +628,24 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 palette: self.data.palette.variation
             };
 
+            console.log('[Wizard] Generating Prototype for:', template.name, 'Payload:', payload);
+
             $.post(ajaxurl, payload, function (res) {
+                console.log('[Wizard] Prototype Response:', res);
                 if (res.success && res.data.status === 'COMPLETED') {
                     $status.find('.ws-status-text').text('Installing Prototype...');
                     self.installPrototype(res.data.response, template.name, $card, template.id);
                 } else {
+                    const data = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
+                    let errorMsg = typeof data === 'object' ? (data.msg || JSON.stringify(data)) : data;
+
                     $status.find('.ws-status-text').text('Generation Error');
+                    console.error('[Wizard] Prototype Generation Error:', data);
+                    alert('Generation Failed: ' + errorMsg);
                     $btn.prop('disabled', false).css('opacity', 1);
                 }
-            }).fail(function () {
+            }).fail(function (jqXHR) {
+                console.error('[Wizard] Prototype Request Failed:', jqXHR);
                 alert('Connection error during prototype generation.');
                 $btn.prop('disabled', false).css('opacity', 1);
             });
@@ -611,18 +675,83 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             });
         },
 
+        fetchRecentProjects: function () {
+            const self = this;
+            $.post(ajaxurl, {
+                action: 'aipg_list_studio_projects',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : ''
+            }, function (res) {
+                if (res.success && res.data.projects.length > 0) {
+                    self.renderRecentProjects(res.data.projects);
+                } else {
+                    $('#ws-recent-projects-list').html('<p style="color:#999; font-size:13px; font-style:italic;">No saved projects found. Your first design journey starts here!</p>');
+                }
+            });
+        },
+
+        renderRecentProjects: function (projects) {
+            const listHtml = projects.map(pj => `
+                <div class="ws-project-mini-card">
+                    <div class="ws-pj-info">
+                        <strong>${pj.name}</strong>
+                        <span>${new Date(pj.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="ws-pj-actions">
+                        <button class="ws-btn ws-btn-sm ws-btn-primary ws-btn-load-project" data-id="${pj.id}">Load & Edit</button>
+                        <button class="ws-btn ws-btn-sm ws-btn-secondary ws-btn-delete-project" data-id="${pj.id}" title="Delete">
+                             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            $('#ws-recent-projects-list').html(listHtml);
+        },
+
+        loadProject: function (id) {
+            const $btn = $(`.ws-btn-load-project[data-id="${id}"]`);
+            $btn.text('Loading...').prop('disabled', true);
+
+            $.post(ajaxurl, {
+                action: 'aipg_load_project',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                project_id: id
+            }, function (res) {
+                if (res.success) {
+                    window.location.href = res.data.redirect_url;
+                } else {
+                    alert('Load failed: ' + res.data);
+                    $btn.text('Load & Edit').prop('disabled', false);
+                }
+            });
+        },
+
+        deleteProject: function (id) {
+            $.post(ajaxurl, {
+                action: 'aipg_delete_project',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                project_id: id
+            }, function (res) {
+                if (res.success) {
+                    WPStudioWizard.fetchRecentProjects();
+                } else {
+                    alert('Delete failed.');
+                }
+            });
+        },
+
         showProjectsView: function () {
             const self = this;
             $('#wp-studio-wizard-root').html(`
                 <div class="ws-wizard-step">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h2 class="ws-title">My AI Studio Projects</h2>
-                        <button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="location.reload()">Back to Wizard</button>
+                    <div class="ws-step-header">
+                        <h2 class="ws-title">My Designs</h2>
+                        <p class="ws-subtitle">Manage and continue your AI-architected creations.</p>
                     </div>
-                    <p class="ws-subtitle">Manage your saved layouts and active deployments.</p>
-                    
-                    <div id="ws-projects-list" class="ws-ai-loading">
-                        <div class="ws-mini-spinner"></div> Loading your library...
+                    <div id="ws-projects-grid" class="ws-template-grid">
+                        <div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Retrieving your projects...</div>
+                    </div>
+                    <div class="ws-footer">
+                        <a href="?page=nodevzone" class="ws-btn ws-btn-secondary">Back to Wizard</a>
                     </div>
                 </div>
             `);
@@ -761,16 +890,21 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
         },
 
         callAiStudio: async function (endpoint, payload) {
-            console.warn(`[AI Studio] callAiStudio stack trace for ${endpoint}:`, new Error().stack);
-
             let baseApiUrl = (typeof aipg_wizard_data !== 'undefined' && aipg_wizard_data.api_url)
                 ? aipg_wizard_data.api_url.replace(/\/$/, '')
-                : 'https://app.nodevzone.com';
+                : 'http://localhost:8000';
 
-            baseApiUrl = baseApiUrl.replace('host.docker.internal', 'localhost');
-            const apiUrl = baseApiUrl + '/api/ai-studio/' + endpoint;
+            // SMART REMAPPING: host.docker.internal works INSIDE containers, but 
+            // the browser (OUTSIDE containers) needs 'localhost' or '127.0.0.1'.
+            let requestUrl = baseApiUrl;
+            if (requestUrl.includes('host.docker.internal')) {
+                console.log('%c[AI Studio] Remapping host.docker.internal -> localhost for browser accessibility', 'color: #f39c12; font-weight: bold;');
+                requestUrl = requestUrl.replace('host.docker.internal', 'localhost');
+            }
 
-            console.log(`[AI Studio] Calling ${endpoint} with payload:`, payload);
+            const apiUrl = requestUrl + '/api/ai-studio/' + endpoint;
+
+            console.log(`[AI Studio] Fetching from AI: ${apiUrl}`, payload);
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -821,5 +955,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             WPStudioWizard.init();
         }
     });
+
+    // Expose to global scope for inline onclick handlers
+    window.WPStudioWizard = WPStudioWizard;
 
 })(jQuery);

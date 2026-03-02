@@ -46,6 +46,18 @@ function aipg_create_database_table() {
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     dbDelta( $sql );
+
+    // Also create projects table
+    $table_projects = $wpdb->prefix . 'aipg_projects';
+    $sql_projects = "CREATE TABLE $table_projects (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+        name varchar(255) NOT NULL,
+        screenshot_url text,
+        snapshot longtext NOT NULL,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    dbDelta( $sql_projects );
 }
 
 // 2. Admin Menu Setup
@@ -142,7 +154,7 @@ function aipg_enqueue_admin_assets( $hook ) {
         wp_localize_script( 'wp-studio-wizard-script-v3', 'aipg_wizard_data', [
             'ajax_url'   => admin_url( 'admin-ajax.php' ),
             'nonce'      => wp_create_nonce( 'aipg_ajax_nonce' ),
-            'api_url'    => get_option( 'aipg_api_url', 'https://app.nodevzone.com' ),
+            'api_url'    => get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' ),
             'cache_bust' => time()
         ] );
     }
@@ -166,9 +178,10 @@ function aipg_enqueue_studio_editor() {
     wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], AIPG_VERSION, true );
 
     wp_localize_script( 'aipg-studio-editor-script', 'aipg_editor_vars', [
-        'ajaxurl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'aipg_editor_nonce' ),
-        'post_id' => $post_id
+        'ajaxurl'    => admin_url( 'admin-ajax.php' ),
+        'nonce'      => wp_create_nonce( 'aipg_editor_nonce' ),
+        'post_id'    => $post_id,
+        'wizard_url' => admin_url( 'admin.php?page=nodevzone' )
     ]);
 
     // Diagnostic log in footer for admin
@@ -732,13 +745,19 @@ function aipg_ensure_table_exists() {
         // phpcs:enable
         aipg_create_database_table();
     } else {
-        // Table exists, check if new columns exist (simple migration check)
-        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-        $column = $wpdb->get_results( "SHOW COLUMNS FROM {$table_name} LIKE 'external_project_id'" );
-        $column_v = $wpdb->get_results( "SHOW COLUMNS FROM {$table_name} LIKE 'version'" );
-        // phpcs:enable
-        if ( empty( $column ) || empty( $column_v ) ) {
+        // Also check projects table
+        $table_projects = $wpdb->prefix . 'aipg_projects';
+        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table_projects}'" ) !== $table_projects ) {
             aipg_create_database_table();
+        } else {
+            // Table exists, check if new columns exist (simple migration check)
+            // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $column = $wpdb->get_results( "SHOW COLUMNS FROM {$table_name} LIKE 'external_project_id'" );
+            $column_v = $wpdb->get_results( "SHOW COLUMNS FROM {$table_name} LIKE 'version'" );
+            // phpcs:enable
+            if ( empty( $column ) || empty( $column_v ) ) {
+                aipg_create_database_table();
+            }
         }
     }
 }
@@ -1636,7 +1655,7 @@ function aipg_ajax_generate_studio_prototype() {
     $prototype_prompt = isset( $_POST['prototype_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prototype_prompt'] ) ) : '';
     $palette = isset( $_POST['palette'] ) ? (array) $_POST['palette'] : [];
 
-    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-prototype';
 
     $response = wp_remote_post( $endpoint, [
@@ -1646,11 +1665,16 @@ function aipg_ajax_generate_studio_prototype() {
             'prototype_prompt' => $prototype_prompt,
             'palette' => $palette
         ]),
-        'timeout'     => 60,
+        'timeout'     => 120, // Increased to 120s for large AI models
     ]);
 
     if ( is_wp_error( $response ) ) {
-        wp_send_json_error( $response->get_error_message() );
+        error_log('[AI Studio] Connection Error: ' . $response->get_error_message() . ' Endpoint: ' . $endpoint);
+        wp_send_json_error( [
+            'msg' => 'Backend Connection Failed: ' . $response->get_error_message(),
+            'endpoint' => $endpoint,
+            'debug' => 'PHP Proxy Error'
+        ]);
     }
 
     $body = wp_remote_retrieve_body( $response );
@@ -1794,12 +1818,14 @@ function aipg_ajax_list_studio_projects() {
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
-    $projects = get_option( 'aipg_studio_projects', [] );
-    $active_id = get_option( 'aipg_studio_active_project', '' );
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'aipg_projects';
+    
+    $projects = $wpdb->get_results( "SELECT id, name, time as timestamp, snapshot FROM $table_name ORDER BY time DESC", ARRAY_A );
 
     wp_send_json_success([
-        'projects'  => array_values($projects),
-        'active_id' => $active_id
+        'projects'  => $projects,
+        'active_id' => get_option( 'aipg_studio_active_project', '' )
     ]);
 }
 
@@ -1868,6 +1894,7 @@ function aipg_ajax_remove_studio_project() {
  * AJAX Handler for Contextual AI Editing (See-Click-Prompt)
  */
 add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+add_action( 'wp_ajax_aipg_save_as_project', 'aipg_ajax_save_as_project' );
 function aipg_ajax_studio_contextual_edit() {
     check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
 
@@ -1889,7 +1916,7 @@ function aipg_ajax_studio_contextual_edit() {
         wp_send_json_error( 'Incomplete data for AI refinement.' );
     }
 
-    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
     $license = get_option( 'aipg_license_key', '' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/refine-block';
 
@@ -2083,6 +2110,111 @@ function aipg_ajax_studio_contextual_edit() {
         file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err . "\n", FILE_APPEND);
         wp_send_json_error( 'Fatal error processing replacement: ' . $e->getMessage() );
     }
+}
+
+/**
+ * AJAX handler to save the current page state as a Project snapshot.
+ */
+function aipg_ajax_save_as_project() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+    
+    $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+    $project_name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : 'Untitled Project';
+    
+    if (!$post_id) wp_send_json_error('Missing Post ID');
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'aipg_projects';
+
+    // Capture current post content
+    $post = get_post($post_id);
+    $content = $post->post_content;
+
+    // Capture global styles (theme config)
+    $theme_config = get_option( 'aipg_studio_theme_config', [] );
+
+    // Capture active template if FSE
+    $snapshot = [
+        'post_id' => $post_id,
+        'content' => $content,
+        'theme_config' => $theme_config,
+        'timestamp' => current_time('mysql')
+    ];
+
+    $result = $wpdb->insert(
+        $table_name,
+        [
+            'time' => current_time('mysql'),
+            'name' => $project_name,
+            'snapshot' => wp_json_encode($snapshot)
+        ]
+    );
+
+    if ($result === false) {
+        wp_send_json_error('Database error while saving project: ' . $wpdb->last_error);
+    }
+
+    wp_send_json_success('Project "' . $project_name . '" saved successfully!');
+}
+
+/**
+ * AJAX handler to load a Project snapshot.
+ */
+add_action( 'wp_ajax_aipg_load_project', 'aipg_ajax_load_project' );
+function aipg_ajax_load_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
+    if (!$project_id) wp_send_json_error('Missing Project ID');
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'aipg_projects';
+    $project = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table_name WHERE id = %d", $project_id ) );
+
+    if (!$project) wp_send_json_error('Project not found');
+
+    $snapshot = json_decode($project->snapshot, true);
+    if (!$snapshot) wp_send_json_error('Invalid snapshot data');
+
+    // Restore Post Content
+    $post_id = $snapshot['post_id'];
+    wp_update_post([
+        'ID'           => $post_id,
+        'post_content' => $snapshot['content']
+    ]);
+
+    // Restore Theme Config
+    if (isset($snapshot['theme_config'])) {
+        update_option('aipg_studio_theme_config', $snapshot['theme_config']);
+    }
+
+    wp_send_json_success([
+        'message' => 'Project "' . $project->name . '" restored successfully!',
+        'redirect_url' => get_permalink($post_id)
+    ]);
+}
+
+/**
+ * AJAX handler to delete a Project snapshot.
+ */
+add_action( 'wp_ajax_aipg_delete_project', 'aipg_ajax_delete_project' );
+function aipg_ajax_delete_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
+    if (!$project_id) wp_send_json_error('Missing Project ID');
+
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'aipg_projects';
+    $result = $wpdb->delete($table_name, ['id' => $project_id], ['%d']);
+
+    if ($result === false) {
+        wp_send_json_error('Database error deleting project.');
+    }
+
+    wp_send_json_success('Project deleted successfully.');
 }
 
 /**
@@ -2346,7 +2478,7 @@ function aipg_ajax_sync_remote_projects() {
 
     $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START: Try localhost instead of host.docker.internal for non-docker setups
-    $api_url = get_option( 'aipg_api_url', 'http://127.0.0.1:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 

@@ -19,25 +19,63 @@
     background: rgba(230, 126, 34, 0.15);
 }
 
-/* Subtle 'Click to edit' hint */
-.aipg-block-overlay:hover::after {
-    content: "Click to edit";
-    color: rgba(230, 126, 34, 0.8);
-    background: rgba(255, 255, 255, 0.85);
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(4px);
-    transition: opacity 0.2s ease;
-    opacity: 0.9;
+/* Professional Click Indicator: Cursor + Ripple */
+@keyframes aipgRipple {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0;
+    }
+}
+
+.aipg-block-overlay.aipg-active::after {
+    content: "";
+    width: 64px;
+    height: 64px;
+    background-color: rgba(255, 255, 255, 0.98);
+    /* Arrow Cursor + Ripple Circles SVG */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23e67e22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3' fill='%23e67e22' opacity='0.3'/%3E%3Ccircle cx='12' cy='12' r='8' opacity='0.2'/%3E%3Cpath d='M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z' fill='%23e67e22'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 32px;
+    border: 2px solid #e67e22;
+    border-radius: 50%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100000;
+}
+
+/* Secondary element for the actual ripple animation */
+.aipg-block-overlay.aipg-active::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    border: 3px solid #e67e22;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    animation: aipgRipple 1.5s infinite;
+    z-index: 99999;
+    pointer-events: none;
 }
 
 /* Hide the hint on very small blocks */
-.aipg-block-overlay.aipg-compact:hover::after {
+.aipg-block-overlay.aipg-compact::after,
+.aipg-block-overlay.aipg-compact::before {
     display: none;
 }
 
@@ -235,4 +273,61 @@
     margin-top: 2px;
     display: block;
     font-weight: 400;
+}
+
+/* Save Project Button */
+.aipg-save-btn {
+    margin-left: 15px;
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+}
+
+.aipg-save-btn:hover {
+    background: #34495e;
+    transform: scale(1.05);
+}
+
+.aipg-save-btn:active {
+    transform: scale(0.95);
+}
+
+.aipg-save-btn.aipg-save-success {
+    background: #27ae60;
+    pointer-events: none;
+}
+
+/* Exit Button */
+.aipg-exit-btn {
+    margin-left: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #2c3e50;
+    border: 1px solid rgba(44, 62, 80, 0.2);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.aipg-exit-btn:hover {
+    background: #e74c3c;
+    color: white;
+    border-color: #e74c3c;
+    transform: rotate(-10deg);
+}
+
+.aipg-exit-btn svg {
+    display: block;
 }

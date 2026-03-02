@@ -39,12 +39,18 @@
 
             // Float Toggle Mode
             this.$toggle = $(`
-                <div class="aipg-mode-toggle">
+                <div class="aipg-mode-toggle ${this.aiEnabled ? 'aipg-mode-ai' : ''}">
                     <div class="aipg-toggle-switch"><div class="aipg-toggle-knob"></div></div>
                     <div>
                         <div class="aipg-mode-label">AI Edit Mode</div>
                         <div class="aipg-mode-desc">Click elements to refine</div>
                     </div>
+                    ${this.aiEnabled ? `
+                        <button id="aipg-save-project-btn" class="aipg-save-btn">Save Project</button>
+                        <button id="aipg-exit-wizard-btn" class="aipg-exit-btn" title="Exit to Wizard">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        </button>
+                    ` : ''}
                 </div>
             `).appendTo('body');
 
@@ -74,7 +80,7 @@
 
             $(document).on('mouseleave', '[class*="wp-block-"]', function () {
                 if (!self.aiEnabled || self.isEditing) return;
-                self.$overlay.hide();
+                self.$overlay.hide().removeClass('aipg-active');
             });
 
             // Click detection via coordinates (to avoid flickering from pointer-events: auto)
@@ -95,12 +101,38 @@
                 }
             });
 
+            // Save Project Button
+            $(document).on('click', '#aipg-save-project-btn', function (e) {
+                e.stopPropagation();
+                self.saveProject();
+            });
+
             // Toggle Mode Click
-            this.$toggle.on('click', function () {
+            this.$toggle.on('click', '.aipg-toggle-switch, .aipg-toggle-info', function () {
                 self.aiEnabled = !self.aiEnabled;
                 localStorage.setItem('aipg_ai_enabled', self.aiEnabled);
                 self.updateModeUI();
-                if (!self.aiEnabled) self.$overlay.hide();
+                if (!self.aiEnabled) {
+                    self.$overlay.hide();
+                    $('#aipg-save-project-btn').remove();
+                } else {
+                    if (!$('#aipg-save-project-btn').length) {
+                        self.$toggle.append(`
+                            <button id="aipg-save-project-btn" class="aipg-save-btn">Save Project</button>
+                            <button id="aipg-exit-wizard-btn" class="aipg-exit-btn" title="Exit to Wizard">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                            </button>
+                        `);
+                    }
+                }
+            });
+
+            // Exit Wizard Button
+            $(document).on('click', '#aipg-exit-wizard-btn', function (e) {
+                e.stopPropagation();
+                if (confirm('Exit to Onboarding Wizard? Any unsaved changes on this page will be lost.')) {
+                    window.location.href = aipg_editor_vars.wizard_url;
+                }
             });
 
             // Modal Actions
@@ -127,8 +159,8 @@
             const width = $block.outerWidth();
             const height = $block.outerHeight();
 
-            // Toggle compact mode for small elements
-            if (width < 120) {
+            // Toggle compact mode for small elements - avoid overlapping icons
+            if (width < 120 || height < 60) {
                 this.$overlay.addClass('aipg-compact');
             } else {
                 this.$overlay.removeClass('aipg-compact');
@@ -139,7 +171,7 @@
                 left: offset.left,
                 width: width,
                 height: height
-            }).show();
+            }).addClass('aipg-active').show();
         },
 
         openModal: function () {
@@ -324,6 +356,35 @@
                     alert(errMsg);
                     console.error('[AI Studio] Request Error:', status, error, xhr);
                     $btn.text('Try Again').prop('disabled', false);
+                }
+            });
+        },
+
+        saveProject: function () {
+            const name = prompt('Enter a name for this project version:', 'New Design Variation');
+            if (!name) return;
+
+            const $btn = $('#aipg-save-project-btn');
+            const originalText = $btn.text();
+            $btn.text('Saving...').prop('disabled', true);
+
+            const payload = {
+                action: 'aipg_save_as_project',
+                nonce: aipg_editor_vars.nonce,
+                post_id: aipg_editor_vars.post_id,
+                name: name
+            };
+
+            $.post(aipg_editor_vars.ajaxurl, payload, function (response) {
+                if (response.success) {
+                    alert(response.data);
+                    $btn.text('Saved!').addClass('aipg-save-success');
+                    setTimeout(() => {
+                        $btn.text(originalText).removeClass('aipg-save-success').prop('disabled', false);
+                    }, 3000);
+                } else {
+                    alert('Error: ' + response.data);
+                    $btn.text(originalText).prop('disabled', false);
                 }
             });
         }

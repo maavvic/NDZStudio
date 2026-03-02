@@ -460,3 +460,50 @@
         transform: rotate(360deg);
     }
 }
+
+/* Recent Projects Mini Cards */
+.ws-project-mini-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 16px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.ws-project-mini-card:hover {
+    border-color: var(--ws-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    background: #fff;
+}
+
+.ws-pj-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.ws-pj-info strong {
+    font-size: 15px;
+    color: var(--ws-text);
+}
+
+.ws-pj-info span {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.ws-pj-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.ws-btn-sm {
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 10px;
+}
