@@ -1998,10 +1998,10 @@ function aipg_ajax_studio_contextual_edit() {
         'body'        => wp_json_encode([
             'prompt'          => $prompt,
             'markup'          => $markup, // Keep for context
-            'computed_styles' => json_decode($computed_styles, true),
+            'computed_styles' => empty(json_decode($computed_styles, true)) ? null : json_decode($computed_styles),
             'parent_markup'   => $parent_markup,
             'model_tier'      => 'medium',
-            'theme_config'    => get_option( 'aipg_studio_theme_config', [] ),
+            'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
             'dynamic_db_block'=> $serialized_target_block, // Hijacking this variable name to mean "Block Grammar Mode"
         ]),
         'timeout'     => 120,
@@ -2016,8 +2016,9 @@ function aipg_ajax_studio_contextual_edit() {
     $data = json_decode( $body, true );
     
     if ( ! $data || ! isset( $data['new_markup'] ) ) {
-        error_log('[AI Studio] Refinement Parse Error or missing new_markup');
-        wp_send_json_error( 'AI failed to refine this block.' );
+        $error_detail = isset($data['detail']) ? (is_array($data['detail']) ? json_encode($data['detail']) : $data['detail']) : 'Unknown backend error or missing new_markup';
+        error_log('[AI Studio] Refinement Parse Error: ' . $error_detail . ' | Raw body: ' . $body);
+        wp_send_json_error( 'AI failed to refine this block. Backend Error: ' . $error_detail );
     }
 
     try {
@@ -2089,6 +2090,67 @@ function aipg_ajax_studio_contextual_edit() {
 
         // Render just the newly designed block to return to the frontend
         $rendered_markup = do_blocks( $new_block_grammar );
+        
+        // Template parts need custom handling in AJAX contexts because do_blocks 
+        // often returns generic wrappers rather than their internal HTML tree.
+        if ( strpos($new_block_grammar, 'wp:template-part') !== false ) {
+            $parsed_tp = parse_blocks($new_block_grammar);
+            if (!empty($parsed_tp[0])) {
+                $attrs = $parsed_tp[0]['attrs'] ?? [];
+                $slug = $attrs['slug'] ?? '';
+                $theme = $attrs['theme'] ?? wp_get_theme()->get_stylesheet();
+                $tag = $attrs['tagName'] ?? 'div';
+                $style_data = isset($attrs['style']) ? wp_style_engine_get_styles($attrs['style']) : [];
+                $style_str = $style_data['css'] ?? '';
+                $class_str = "wp-block-template-part aipg-part-{$slug}";
+                if (!empty($style_data['class'])) {
+                    $class_str .= ' ' . $style_data['class'];
+                }
+                
+                // Try to get the actual template part from the DB/Theme
+                // This is needed because 'do_blocks' on the raw grammar just returns empty for template parts
+                $template_part_post = null;
+                $inner_html = '';
+                if (!empty($slug)) {
+                    $template_parts = get_block_templates([], 'wp_template_part');
+                    foreach($template_parts as $tp) {
+                        if ($tp->slug === $slug && $tp->theme === $theme) {
+                            $template_part_post = $tp;
+                            break;
+                        }
+                    }
+                    
+                    if ($template_part_post && !empty($template_part_post->content)) {
+                        $inner_html = do_blocks($template_part_post->content);
+                        
+                        // If do_blocks returns just comments, strip them
+                        $clean_html = preg_replace('/<!--(.|\s)*?-->/', '', $inner_html);
+                        
+                        if (empty(trim($clean_html))) {
+                            // The blocks didn't render into actual HTML
+                            $inner_html = ''; 
+                        } else {
+                            $db_diagnostics[] = "Rendered template part from DB content: {$slug}";
+                        }
+                    }
+                }
+                
+                if (empty(trim($inner_html))) {
+                    $db_diagnostics[] = "Warning: Template part rendered empty HTML, creating synthetic wrapper.";
+                    $slug = $slug ?: 'template-part';
+                    $inner_html = "<div style=\"padding: 20px; text-align: center; opacity: 0.7;\">
+                            <em>AI Updated Template Part ({$slug}). Refresh page to see full changes.</em>
+                        </div>";
+                }
+                
+                // Construct the final HTML wrapper that reflects the block's current styling
+                $rendered_markup = "<{$tag} class=\"{$class_str}\" style=\"{$style_str}\">{$inner_html}</{$tag}>";
+                
+                // Log the final payload for debugging
+                $db_diagnostics[] = "Final Template Part HTML Length: " . strlen($rendered_markup);
+                file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - PAYLOAD OUTPUT: " . substr($rendered_markup, 0, 500) . "...\n", FILE_APPEND);
+            }
+        }
         
         $new_styles = '';
         if ( function_exists( 'wp_style_engine_get_stylesheet_from_context' ) ) {

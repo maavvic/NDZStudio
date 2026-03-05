@@ -38,3 +38,48 @@
 2026-03-02 13:23:42 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
 2026-03-02 13:32:22 - SUCCESS: Tree successfully mutated.
 2026-03-02 13:32:22 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:02:13 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:02:13 - DB Diags: ["No active_template, updating original post ID: 6","Updated ID: 6"]
+2026-03-03 20:02:46 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:02:46 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:20:06 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:20:06 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:21:26 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:21:26 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:26:24 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:26:24 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:28:03 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:28:03 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:29:10 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:29:10 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:38:30 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:38:30 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:40:23 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:40:23 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:46:00 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:46:00 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-03 20:48:55 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:48:55 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer"]
+2026-03-03 20:50:16 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:50:16 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer"]
+2026-03-03 20:55:02 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:55:02 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer"]
+2026-03-03 20:57:00 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:57:00 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:var(--wp--preset--color--contrast);border-top-color:var(--wp--preset--color--base);border-top-style:solid;border-top-width:1px;padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60);padding-left:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);margin-top:0px;margin-bottom:0px;font-size:var(--wp--preset--font-size--x-smal...
+2026-03-03 20:57:00 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4391"]
+2026-03-03 20:59:40 - SUCCESS: Tree successfully mutated.
+2026-03-03 20:59:40 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:var(--wp--preset--color--contrast);border-top-color:var(--wp--preset--color--base);border-top-style:solid;border-top-width:1px;padding-top:var(--wp--preset--spacing--80);padding-bottom:var(--wp--preset--spacing--80);padding-left:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);margin-top:0px;margin-bottom:0px;font-size:var(--wp--preset--font-size--small)...
+2026-03-03 20:59:40 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4364"]
+2026-03-03 21:06:04 - SUCCESS: Tree successfully mutated.
+2026-03-03 21:06:04 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:var(--wp--preset--color--contrast);border-top-color:var(--wp--preset--color--base);border-top-style:solid;border-top-width:1px;padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60);padding-left:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);margin-top:0px;margin-bottom:0px;font-size:var(--wp--preset--font-size--small)...
+2026-03-03 21:06:04 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4389"]
+2026-03-03 21:09:26 - SUCCESS: Tree successfully mutated.
+2026-03-03 21:09:26 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:var(--wp--preset--color--contrast);border-top-color:var(--wp--preset--color--base);border-top-style:solid;border-top-width:1px;padding-top:var(--wp--preset--spacing--80);padding-bottom:var(--wp--preset--spacing--80);padding-left:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);margin-top:0px;margin-bottom:0px;font-size:var(--wp--preset--font-size--small)...
+2026-03-03 21:09:26 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4384"]
+2026-03-05 15:32:27 - SUCCESS: Tree successfully mutated.
+2026-03-05 15:32:27 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:var(--wp--preset--color--contrast);padding-top:var(--wp--preset--spacing--60);padding-bottom:var(--wp--preset--spacing--60);padding-left:var(--wp--preset--spacing--50);padding-right:var(--wp--preset--spacing--50);margin-top:0px;margin-bottom:0px;font-size:var(--wp--preset--font-size--small);font-family:var(--wp--preset--font-family--sans-serif);font-weight:300;line-height:1.4;text...
+2026-03-05 15:32:27 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4297"]
+2026-03-05 15:33:36 - SUCCESS: Tree successfully mutated.
+2026-03-05 15:33:36 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 15:34:38 - SUCCESS: Tree successfully mutated.
+2026-03-05 15:34:38 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]

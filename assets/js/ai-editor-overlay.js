@@ -324,14 +324,58 @@
                             // Fallback for Dynamic Blocks like Template Parts that render as pure HTML
                             // and might lose their jQuery bindings or structural wrapper
                             if ($block.is('footer, header, main, .wp-block-template-part')) {
-                                // If the original was a structural tag and the new element is multiple nodes
-                                // or a generic div, we need to carefully replace the inner HTML or 
-                                // wrap it to preserve Layout
-                                if ($newElement.length > 1 || !$newElement.is($block.prop('tagName'))) {
-                                    $block.html($newElement);
-                                    $block.addClass('aipg-fade-in');
+                                // For structural tags, destroying the tag with .replaceWith() often strips 
+                                // critical FSE theme classes (like alignfull, is-layout-constrained) making it vanish.
+                                // Instead, we will merge the new styles and replace only the inner HTML.
+
+                                let $actualReplacement = $newElement;
+
+                                if (!$newElement.is($block.prop('tagName'))) {
+                                    let $innerTag = $('<div>').append($newElement).find($block.prop('tagName')).first();
+                                    if ($innerTag.length > 0) {
+                                        $actualReplacement = $innerTag;
+                                    }
+                                }
+
+
+                                if ($actualReplacement.is($block.prop('tagName'))) {
+                                    // It matches! Preserve the original $block node.
+                                    // 1. Update Inner HTML
+                                    $block.html($actualReplacement.html());
+
+                                    // 2. Apply new AI styles
+                                    const newStyle = $actualReplacement.attr('style');
+                                    if (newStyle) {
+                                        $block.attr('style', newStyle);
+                                    }
+
+                                    // 3. Add any new generated classes without destroying original ones
+                                    const newClass = $actualReplacement.attr('class');
+                                    if (newClass) {
+                                        $block.addClass(newClass);
+                                    }
                                 } else {
-                                    $block.replaceWith($newElement);
+                                    // Absolute fallback - ensure we don't nest a full wrapper inside
+                                    // by taking the innerHTML if the wrapper has children
+                                    if ($newElement.children().length > 0) {
+                                        $block.html($newElement.html());
+                                    } else {
+                                        $block.html($newElement); // fallback if it's just raw content
+                                    }
+
+                                    // Still apply the new styles/classes to the preserved structural block
+                                    const newStyle = $newElement.attr('style');
+                                    if (newStyle) $block.attr('style', newStyle);
+
+                                    const newClass = $newElement.attr('class');
+                                    if (newClass) $block.addClass(newClass);
+                                }
+
+                                $block.addClass('aipg-fade-in');
+
+                                // Re-bind overlay clicking events to the new element
+                                if (typeof window.aipgBindOverlayEvents === 'function') {
+                                    window.aipgBindOverlayEvents();
                                 }
                             } else {
                                 $block.replaceWith($newElement);
