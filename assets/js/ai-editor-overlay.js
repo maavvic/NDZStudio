@@ -11,9 +11,13 @@
         $currentBlock: null,
         isEditing: false,
         aiEnabled: true,
+        outlinesEnabled: false,
+        modelTier: 'medium',
 
         init: function () {
             this.aiEnabled = localStorage.getItem('aipg_ai_enabled') !== 'false';
+            this.outlinesEnabled = localStorage.getItem('aipg_outlines_enabled') === 'true';
+            this.modelTier = localStorage.getItem('aipg_model_tier') || 'claude_auto';
             this.createUI();
             this.bindEvents();
             this.updateModeUI();
@@ -26,13 +30,28 @@
 
             this.$modal = $(`
                 <div class="aipg-modal-backdrop"></div>
-                <div class="aipg-editor-modal">
+                
+                <!-- Refinement Prompt Modal -->
+                <div class="aipg-editor-modal" id="aipg-refine-modal">
                     <h3>Refine this section</h3>
                     <p style="font-size: 13px; color: #666;">Provide a prompt to AI to modify this specific block.</p>
                     <textarea id="aipg-prompt-input" placeholder="e.g., 'Make this heading more professional', 'Add a button below the text', 'Change this background'"></textarea>
                     <div style="text-align: right;">
                         <button class="ws-btn-secondary" id="aipg-cancel-edit">Cancel</button>
                         <button class="ws-btn-primary" id="aipg-submit-edit">Update Block</button>
+                    </div>
+                </div>
+
+                <!-- Error Diagnostics Modal -->
+                <div class="aipg-editor-modal" id="aipg-error-modal" style="width: 600px; max-width: 95%;">
+                    <h3 style="color: #e74c3c;">AI Refinement Error</h3>
+                    <p id="aipg-error-message" style="font-size: 14px; font-weight: 500; margin-bottom: 10px;"></p>
+                    <div class="aipg-diagnostics-container" style="background: #1e1e1e; color: #a6e22e; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; height: 250px; overflow-y: auto; text-align: left; margin-bottom: 15px; display: none;">
+                        <pre id="aipg-error-diagnostics" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;"></pre>
+                    </div>
+                    <div style="text-align: right; display: flex; justify-content: space-between; align-items: center;">
+                        <button class="ws-btn-secondary" id="aipg-copy-error-btn" style="display: none; font-size: 12px; padding: 6px 12px;">Copy Log</button>
+                        <button class="ws-btn-primary" id="aipg-close-error-modal">Close</button>
                     </div>
                 </div>
             `).appendTo('body');
@@ -46,6 +65,15 @@
                         <div class="aipg-mode-desc">Click elements to refine</div>
                     </div>
                     ${this.aiEnabled ? `
+                        <select id="aipg-model-tier-select" class="aipg-save-btn" style="margin-left: 15px; padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer; appearance: menulist; min-height: 31px;">
+                            <option value="medium" style="color: black;" ${this.modelTier === 'medium' ? 'selected' : ''}>Simple (Gemini Flash)</option>
+                            <option value="complex" style="color: black;" ${this.modelTier === 'complex' ? 'selected' : ''}>Advanced (Gemini Pro)</option>
+                            <option value="claude_auto" style="color: black;" ${this.modelTier === 'claude_auto' ? 'selected' : ''}>Claude (Auto)</option>
+                        </select>
+                        <button id="aipg-toggle-outlines-btn" class="aipg-save-btn" style="margin-left: 10px; background: ${this.outlinesEnabled ? '#e67e22' : '#7f8c8d'};" title="Show Structural Outlines">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M4 4h16v16H4z"></path></svg>
+                            Outlines
+                        </button>
                         <button id="aipg-save-project-btn" class="aipg-save-btn">Save Project</button>
                         <button id="aipg-exit-wizard-btn" class="aipg-exit-btn" title="Exit to Wizard">
                             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -76,11 +104,48 @@
                 // BUT we allow the user to reach outer blocks if they hover on their edges.
                 e.stopPropagation();
                 self.highlightBlock($el);
+
+                if (self.outlinesEnabled) {
+                    $('.aipg-outline-box').remove(); // Clear previous overlays
+
+                    const drawBox = function ($target, levelClass) {
+                        if (!$target || $target.length === 0) return;
+                        const offset = $target.offset();
+                        $('<div class="aipg-outline-box ' + levelClass + '"></div>').css({
+                            top: offset.top,
+                            left: offset.left,
+                            width: $target.outerWidth(),
+                            height: $target.outerHeight()
+                        }).appendTo('body');
+                    };
+
+                    // Find up to 2 wp-block parents
+                    const $parents = $el.parents('[class*="wp-block-"]').slice(0, 2);
+                    if ($parents.length > 0) drawBox($($parents[0]), 'aipg-outline-parent-1');
+                    if ($parents.length > 1) drawBox($($parents[1]), 'aipg-outline-parent-2');
+
+                    // Find direct children
+                    const $children1 = $el.find('[class*="wp-block-"]').filter(function () {
+                        return $(this).parent().closest('[class*="wp-block-"]')[0] === $el[0];
+                    });
+                    $children1.each(function () { drawBox($(this), 'aipg-outline-child-1'); });
+
+                    // Find children of children
+                    const $children2 = $children1.find('[class*="wp-block-"]').filter(function () {
+                        const directParentBlock = $(this).parent().closest('[class*="wp-block-"]')[0];
+                        return Array.from($children1).includes(directParentBlock);
+                    });
+                    $children2.each(function () { drawBox($(this), 'aipg-outline-child-2'); });
+                }
             });
 
-            $(document).on('mouseleave', '[class*="wp-block-"]', function () {
+            $(document).on('mouseleave', '[class*="wp-block-"], header, footer, main, nav', function () {
                 if (!self.aiEnabled || self.isEditing) return;
                 self.$overlay.hide().removeClass('aipg-active');
+
+                if (self.outlinesEnabled) {
+                    $('.aipg-outline-box').remove();
+                }
             });
 
             // Click detection via coordinates (to avoid flickering from pointer-events: auto)
@@ -114,10 +179,21 @@
                 self.updateModeUI();
                 if (!self.aiEnabled) {
                     self.$overlay.hide();
-                    $('#aipg-save-project-btn').remove();
+                    $('#aipg-model-tier-select, #aipg-save-project-btn, #aipg-toggle-outlines-btn, #aipg-exit-wizard-btn').remove();
+                    $('.aipg-outline-parent-1, .aipg-outline-parent-2, .aipg-outline-child-1, .aipg-outline-child-2').removeClass('aipg-outline-parent-1 aipg-outline-parent-2 aipg-outline-child-1 aipg-outline-child-2');
                 } else {
                     if (!$('#aipg-save-project-btn').length) {
                         self.$toggle.append(`
+                            <select id="aipg-model-tier-select" class="aipg-save-btn" style="margin-left: 15px; padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer; appearance: menulist; min-height: 31px;">
+                                <option value="medium" style="color: black;" ${self.modelTier === 'medium' ? 'selected' : ''}>Simple (Gemini Flash)</option>
+                                <option value="complex" style="color: black;" ${self.modelTier === 'complex' ? 'selected' : ''}>Advanced (Gemini Pro)</option>
+                                <option value="claude_haiku" style="color: black;" ${self.modelTier === 'claude_haiku' ? 'selected' : ''}>Simple (Claude Haiku)</option>
+                                <option value="claude_sonnet" style="color: black;" ${self.modelTier === 'claude_sonnet' ? 'selected' : ''}>Advanced (Claude Sonnet)</option>
+                            </select>
+                            <button id="aipg-toggle-outlines-btn" class="aipg-save-btn" style="margin-left: 10px; background: ${self.outlinesEnabled ? '#e67e22' : '#7f8c8d'};" title="Show Structural Outlines">
+                                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M4 4h16v16H4z"></path></svg>
+                                Outlines
+                            </button>
                             <button id="aipg-save-project-btn" class="aipg-save-btn">Save Project</button>
                             <button id="aipg-exit-wizard-btn" class="aipg-exit-btn" title="Exit to Wizard">
                                 <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -125,6 +201,29 @@
                         `);
                     }
                 }
+            });
+
+            // Toggle Outlines Click
+            $(document).on('click', '#aipg-toggle-outlines-btn', function (e) {
+                e.stopPropagation();
+                self.outlinesEnabled = !self.outlinesEnabled;
+                localStorage.setItem('aipg_outlines_enabled', self.outlinesEnabled);
+
+                const $btn = $(this);
+                if (self.outlinesEnabled) {
+                    $btn.css('background', '#e67e22');
+                } else {
+                    $btn.css('background', '#7f8c8d');
+                    $('.aipg-outline-parent-1, .aipg-outline-parent-2, .aipg-outline-child-1, .aipg-outline-child-2').removeClass('aipg-outline-parent-1 aipg-outline-parent-2 aipg-outline-child-1 aipg-outline-child-2');
+                }
+            });
+
+            // Model Tier Change (delegated due to dynamic DOM)
+            $(document).on('change', '#aipg-model-tier-select', function (e) {
+                e.stopPropagation();
+                self.modelTier = $(this).val();
+                localStorage.setItem('aipg_model_tier', self.modelTier);
+                console.log('[AI Studio] Active Model Tier:', self.modelTier);
             });
 
             // Exit Wizard Button
@@ -138,7 +237,23 @@
             // Modal Actions
             $('#aipg-cancel-edit').on('click', () => self.closeModal());
             $('#aipg-submit-edit').on('click', () => self.submitToAi());
-            $('.aipg-modal-backdrop').on('click', () => self.closeModal());
+            $('#aipg-close-error-modal').on('click', () => self.closeErrorModal());
+
+            $('#aipg-copy-error-btn').on('click', function (e) {
+                e.stopPropagation();
+                const textToCopy = $('#aipg-error-diagnostics').text();
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const $btn = $(this);
+                    const originalText = $btn.text();
+                    $btn.text('Copied!');
+                    setTimeout(() => $btn.text(originalText), 2000);
+                });
+            });
+
+            $('.aipg-modal-backdrop').on('click', () => {
+                self.closeModal();
+                self.closeErrorModal();
+            });
         },
 
         updateModeUI: function () {
@@ -177,7 +292,7 @@
         openModal: function () {
             this.isEditing = true;
             $('.aipg-modal-backdrop').fadeIn(200);
-            $('.aipg-editor-modal').fadeIn(200);
+            $('#aipg-refine-modal').fadeIn(200);
             $('#aipg-prompt-input').val('').focus();
             $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
         },
@@ -185,7 +300,42 @@
         closeModal: function () {
             this.isEditing = false;
             $('.aipg-modal-backdrop').fadeOut(200);
-            $('.aipg-editor-modal').fadeOut(200);
+            $('#aipg-refine-modal').fadeOut(200);
+            this.$overlay.hide();
+        },
+
+        showErrorModal: function (message, diagnosticsObj = null) {
+            this.isEditing = true;
+            $('#aipg-refine-modal').hide(); // Hide refinement modal if it was open
+
+            $('#aipg-error-message').text(message);
+
+            const $diagContainer = $('.aipg-diagnostics-container');
+            const $copyBtn = $('#aipg-copy-error-btn');
+
+            if (diagnosticsObj) {
+                try {
+                    const diagStr = JSON.stringify(diagnosticsObj, null, 2);
+                    $('#aipg-error-diagnostics').text(diagStr);
+                    $diagContainer.show();
+                    $copyBtn.show();
+                } catch (e) {
+                    $diagContainer.hide();
+                    $copyBtn.hide();
+                }
+            } else {
+                $diagContainer.hide();
+                $copyBtn.hide();
+            }
+
+            $('.aipg-modal-backdrop').fadeIn(200);
+            $('#aipg-error-modal').fadeIn(200);
+        },
+
+        closeErrorModal: function () {
+            this.isEditing = false;
+            $('.aipg-modal-backdrop').fadeOut(200);
+            $('#aipg-error-modal').fadeOut(200);
             this.$overlay.hide();
         },
 
@@ -287,7 +437,8 @@
                 markup: originalMarkup,
                 computed_styles: JSON.stringify(computedStyles),
                 parent_markup: parentMarkup,
-                post_id: aipg_editor_vars.post_id
+                post_id: aipg_editor_vars.post_id,
+                model_tier: this.modelTier
             };
 
             $.ajax({
@@ -384,10 +535,13 @@
                         $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
                     } else {
                         const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
-                        if (response.data && response.data.diagnostics) {
-                            console.error('[AI Studio] Refinement Diagnostics:', response.data.diagnostics);
+                        const diagData = (response.data && response.data.diagnostics) ? response.data.diagnostics : null;
+
+                        if (diagData) {
+                            console.error('[AI Studio] Refinement Diagnostics:', diagData);
                         }
-                        alert('AI Refinement Error: ' + errorMsg);
+
+                        self.showErrorModal(errorMsg, diagData);
                         $btn.text('Try Again').prop('disabled', false);
                     }
                 },
@@ -397,7 +551,7 @@
                     if (status === 'timeout') {
                         errMsg = 'The AI took too long to respond (timeout). Please try a simpler request.';
                     }
-                    alert(errMsg);
+                    self.showErrorModal(errMsg, { status: status, error: error, details: xhr.responseText });
                     console.error('[AI Studio] Request Error:', status, error, xhr);
                     $btn.text('Try Again').prop('disabled', false);
                 }

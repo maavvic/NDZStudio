@@ -83,3 +83,32 @@
 2026-03-05 15:33:36 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
 2026-03-05 15:34:38 - SUCCESS: Tree successfully mutated.
 2026-03-05 15:34:38 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:02:26 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:02:26 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:03:17 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:03:17 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:04:10 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:04:10 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:05:10 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:05:10 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:06:17 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:06:17 - DB Diags: ["No active_template, updating original post ID: 9","Updated ID: 9"]
+2026-03-05 16:08:01 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:08:02 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer" style="color:var(--wp--preset--color--base);background-color:#080808;border-top-style:solid;border-top-width:1px;padding-top:120px;padding-bottom:80px;padding-left:var(--wp--preset--spacing--80);padding-right:var(--wp--preset--spacing--80);margin-top:0px;margin-bottom:0px;font-size:0.65rem;font-family:var(--wp--preset--font-family--sans-serif);font-weight:500;line-height:1.2;text-transform:uppercase;letter-spacing:0.4em;">
+<div class="wp-bl...
+2026-03-05 16:08:02 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Rendered template part from DB content: footer","Final Template Part HTML Length: 4234"]
+2026-03-05 16:09:07 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:09:07 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-05 16:32:23 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:32:23 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-05 16:41:24 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:41:24 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-05 16:42:08 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:42:08 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44"]
+2026-03-05 16:42:53 - SUCCESS: Tree successfully mutated.
+2026-03-05 16:42:53 - PAYLOAD OUTPUT: <div class="wp-block-template-part aipg-part-" style="border-bottom-width:1px;border-bottom-style:solid;padding-top:clamp(1.5rem, 3vh, 2.5rem);padding-bottom:clamp(1.5rem, 3vh, 2.5rem);padding-left:clamp(1.5rem, 5vw, 4rem);padding-right:clamp(1.5rem, 5vw, 4rem);margin-top:0px;margin-bottom:0px;"><div style="padding: 20px; text-align: center; opacity: 0.7;">
+                            <em>AI Updated Template Part (template-part). Refresh page to see full changes.</em>
+                        <...
+2026-03-05 16:42:53 - DB Diags: ["Matched Template Slug: page","Using existing active_template ID: 44","Updated ID: 44","Warning: Template part rendered empty HTML, creating synthetic wrapper.","Final Template Part HTML Length: 511"]
+2026-03-05 18:51:21 - SUCCESS: Tree successfully mutated.
+2026-03-05 18:51:21 - DB Diags: ["No active_template, updating original post ID: 6","Updated ID: 6"]

@@ -589,7 +589,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 site_name: self.data.siteName,
                 industry: self.data.industry,
                 style: self.data.style,
-                palette: self.data.palette.variation
+                palette: self.data.palette.variation,
+                model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
             };
 
             this.data.error = null;
@@ -625,7 +626,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
-                palette: self.data.palette.variation
+                palette: self.data.palette.variation,
+                model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
             };
 
             console.log('[Wizard] Generating Prototype for:', template.name, 'Payload:', payload);
@@ -829,7 +831,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const res = await this.callAiStudio('generate-prototype', {
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
-                palette: this.data.palette.variation
+                palette: this.data.palette.variation,
+                model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
             });
             if (res.status === 'COMPLETED') return res.response;
             throw new Error('AI Generation failed');
@@ -908,7 +911,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(payload)
                 });
 

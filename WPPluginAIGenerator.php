@@ -152,10 +152,10 @@ function aipg_enqueue_admin_assets( $hook ) {
 
         // Use a new variable name aipg_wizard_data to avoid clashes with any cached aipg_vars
         wp_localize_script( 'wp-studio-wizard-script-v3', 'aipg_wizard_data', [
-            'ajax_url'   => admin_url( 'admin-ajax.php' ),
-            'nonce'      => wp_create_nonce( 'aipg_ajax_nonce' ),
-            'api_url'    => get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' ),
-            'cache_bust' => time()
+            'ajax_url'      => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'aipg_ajax_nonce' ),
+            'api_url'       => get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' ),
+            'cache_bust'    => time()
         ] );
     }
 }
@@ -1143,7 +1143,7 @@ function aipg_render_page() {
                 <?php // DEV-END ?>
                 
                 <div style="flex-grow: 1;">
-                     <label class="aipg-label"><?php esc_html_e( 'License Key', 'ai-studio-generator' ); ?></label>
+                     <label class="aipg-label"><?php esc_html_e( 'SaaS License / Gemini Key', 'ai-studio-generator' ); ?></label>
                      <input type="password" name="aipg_license_key" value="<?php echo esc_attr( $current_key ); ?>" class="aipg-input">
                 </div>
 
@@ -1659,7 +1659,9 @@ function aipg_ajax_generate_studio_prototype() {
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-prototype';
 
     $response = wp_remote_post( $endpoint, [
-        'headers'     => [ 'Content-Type' => 'application/json' ],
+        'headers'     => [ 
+            'Content-Type'    => 'application/json'
+        ],
         'body'        => wp_json_encode([
             'template_name' => $template_name,
             'prototype_prompt' => $prototype_prompt,
@@ -1760,6 +1762,69 @@ function aipg_ajax_install_prototype() {
         update_option( 'page_on_front', $home_page_id );
     }
 
+    // Install Template Parts (Header / Footer) if present
+    if ( isset( $data['template_parts'] ) && is_array( $data['template_parts'] ) ) {
+        $active_theme = wp_get_theme()->get_stylesheet();
+        error_log("[AI Studio] Found template_parts! Count: " . count($data['template_parts']));
+        
+        foreach ( $data['template_parts'] as $part_data ) {
+            $slug = sanitize_title( $part_data['slug'] );
+            $content = $part_data['content'];
+            $title = ucfirst($slug);
+            error_log("[AI Studio] Processing part slug: {$slug}");
+
+            // Determine the area based on the slug
+            $area = 'uncategorized';
+            if ( strpos( $slug, 'header' ) !== false ) {
+                $area = 'header';
+            } elseif ( strpos( $slug, 'footer' ) !== false ) {
+                $area = 'footer';
+            }
+
+            // Attempt to find existing template part for this theme
+            $existing_parts = get_posts([
+                'name'           => $slug,
+                'post_type'      => 'wp_template_part',
+                'post_status'    => 'publish',
+                'posts_per_page' => 1,
+                'tax_query'      => [
+                    [
+                        'taxonomy' => 'wp_theme',
+                        'field'    => 'name',
+                        'terms'    => $active_theme,
+                    ],
+                ]
+            ]);
+            $existing_part = !empty($existing_parts) ? $existing_parts[0] : null;
+
+            $part_args = [
+                'post_title'   => $title,
+                'post_name'    => $slug,
+                'post_content' => $content,
+                'post_status'  => 'publish',
+                'post_type'    => 'wp_template_part',
+                'tax_input'    => [
+                    'wp_theme' => [ $active_theme ],
+                    'wp_template_part_area' => [ $area ]
+                ]
+            ];
+
+            if ( $existing_part ) {
+                error_log("[AI Studio] Updating existing template part: {$slug} (Area: {$area})");
+                $part_args['ID'] = $existing_part->ID;
+                wp_update_post( $part_args );
+                wp_set_object_terms( $existing_part->ID, $area, 'wp_template_part_area' );
+            } else {
+                error_log("[AI Studio] Creating new template part: {$slug} (Area: {$area})");
+                $post_id = wp_insert_post( $part_args );
+                if ( ! is_wp_error( $post_id ) ) {
+                    wp_set_object_terms( $post_id, $active_theme, 'wp_theme' );
+                    wp_set_object_terms( $post_id, $area, 'wp_template_part_area' );
+                }
+            }
+        }
+    }
+
     // Store theme tokens if provided
     if ( isset( $data['theme_json'] ) ) {
         error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
@@ -1777,6 +1842,105 @@ function aipg_ajax_install_prototype() {
         'message'     => 'Real Gutenberg pages installed!',
         'preview_url' => add_query_arg( '_aipg_preview', time(), home_url('/') )
     ]);
+}
+
+/**
+ * Override FSE Template Parts with AI Studio parts
+ */
+add_filter( 'get_block_template', 'aipg_override_fse_template_parts', 10, 3 );
+function aipg_override_fse_template_parts( $block_template, $id, $template_type ) {
+    if ( $template_type !== 'wp_template_part' ) {
+        return $block_template;
+    }
+    
+    // Extract slug from ID (e.g., 'twentytwentyfour//header' -> 'header')
+    $active_theme = wp_get_theme()->get_stylesheet();
+    $slug = str_replace( $active_theme . '//', '', $id );
+
+    // Normalize slug to catch variations like 'footer-default' or 'header-dark'
+    $search_slug = $slug;
+    if ( strpos( $slug, 'header' ) !== false ) {
+        $search_slug = 'header';
+    } elseif ( strpos( $slug, 'footer' ) !== false ) {
+        $search_slug = 'footer';
+    }
+
+    // Check if we have an AI Studio override for this normalized part
+    $ai_parts = get_posts([
+        'name'           => $search_slug,
+        'post_type'      => 'wp_template_part',
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'tax_query'      => [
+            [
+                'taxonomy' => 'wp_theme',
+                'field'    => 'name',
+                'terms'    => $active_theme,
+            ],
+        ]
+    ]);
+
+    if ( ! empty( $ai_parts ) ) {
+        $ai_part = $ai_parts[0];
+        
+        if ( ! $block_template ) {
+            $block_template = new WP_Block_Template();
+            $block_template->id = $active_theme . '//' . $slug;
+            $block_template->theme = $active_theme;
+            $block_template->slug = $slug;
+            $block_template->source = 'custom';
+            $block_template->type = 'wp_template_part';
+        }
+        
+        $block_template->content = $ai_part->post_content;
+        $block_template->title = $ai_part->post_title;
+        $block_template->status = 'publish';
+        $block_template->has_theme_file = true; 
+        $block_template->is_custom = true;
+    }
+    return $block_template;
+}
+
+/**
+ * Secondary override: Force render the AI Studio template parts during block rendering
+ */
+add_filter( 'render_block_core/template-part', 'aipg_force_render_template_part', 10, 2 );
+function aipg_force_render_template_part( $block_content, $block ) {
+    $slug = isset( $block['attrs']['slug'] ) ? $block['attrs']['slug'] : '';
+    if ( empty( $slug ) ) {
+        return $block_content;
+    }
+
+    $active_theme = wp_get_theme()->get_stylesheet();
+
+    // Normalize slug to catch variations like 'footer-default' or 'header-dark'
+    $search_slug = $slug;
+    if ( strpos( $slug, 'header' ) !== false ) {
+        $search_slug = 'header';
+    } elseif ( strpos( $slug, 'footer' ) !== false ) {
+        $search_slug = 'footer';
+    }
+
+    $ai_parts = get_posts([
+        'name'           => $search_slug,
+        'post_type'      => 'wp_template_part',
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'tax_query'      => [
+            [
+                'taxonomy' => 'wp_theme',
+                'field'    => 'name',
+                'terms'    => $active_theme,
+            ],
+        ]
+    ]);
+
+    if ( ! empty( $ai_parts ) ) {
+        $ai_part = $ai_parts[0];
+        return do_blocks( $ai_part->post_content );
+    }
+
+    return $block_content;
 }
 
 /**
@@ -1911,6 +2075,7 @@ function aipg_ajax_studio_contextual_edit() {
     $computed_styles = isset( $_POST['computed_styles'] ) ? wp_unslash( $_POST['computed_styles'] ) : '';
     $parent_markup   = isset( $_POST['parent_markup'] ) ? wp_unslash( $_POST['parent_markup'] ) : '';
     $post_id         = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $model_tier      = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'medium';
 
     if ( empty( $prompt ) || empty( $markup ) || ! $post_id ) {
         wp_send_json_error( 'Incomplete data for AI refinement.' );
@@ -1992,15 +2157,15 @@ function aipg_ajax_studio_contextual_edit() {
 
     $response = wp_remote_post( $endpoint, [
         'headers'     => [
-            'Content-Type' => 'application/json',
-            'X-License-Key'=> $license,
+            'Content-Type'    => 'application/json',
+            'X-License-Key'   => $license
         ],
         'body'        => wp_json_encode([
             'prompt'          => $prompt,
             'markup'          => $markup, // Keep for context
             'computed_styles' => empty(json_decode($computed_styles, true)) ? null : json_decode($computed_styles),
             'parent_markup'   => $parent_markup,
-            'model_tier'      => 'medium',
+            'model_tier'      => $model_tier,
             'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
             'dynamic_db_block'=> $serialized_target_block, // Hijacking this variable name to mean "Block Grammar Mode"
         ]),
@@ -2291,16 +2456,37 @@ function aipg_ajax_delete_project() {
 function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = [] ) {
     if ( empty( $parsed_blocks ) ) return null;
 
-    $norm_target = preg_replace( '/\s+/', ' ', trim($target_html) );
+    // Helper: Normalize spacing and WP typography (smart quotes, dashes)
+    $clean_html = function( $html ) {
+        $html = preg_replace( '/\s+/', ' ', trim($html) );
+        $html = str_replace(
+            ['&#8217;', '&#8216;', '&#8221;', '&#8220;', '&#8211;', '&#8212;', '’', '‘', '”', '“', '–', '—'],
+            ["'", "'", '"', '"', '-', '-', "'", "'", '"', '"', '-', '-'],
+            $html
+        );
+        return $html;
+    };
+
+    $norm_target = $clean_html( $target_html );
 
     foreach ( $parsed_blocks as $block ) {
         if ( empty( $block['blockName'] ) ) continue;
 
         $rendered = render_block( $block );
-        $norm_rendered = preg_replace( '/\s+/', ' ', trim($rendered) );
+        $norm_rendered = $clean_html( $rendered );
 
+        // Generate structural fingerprint:
+        // 1. Strip attributes
         $fingerprint_rendered = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_rendered);
         $fingerprint_target   = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_target);
+        
+        // 2. Strip ALL closing tags to avoid Browser DOM vs PHP auto-closing discrepancies (e.g., <path> vs <path></path>)
+        $fingerprint_rendered = preg_replace('/<\/[a-z0-9]+>/i', '', $fingerprint_rendered);
+        $fingerprint_target   = preg_replace('/<\/[a-z0-9]+>/i', '', $fingerprint_target);
+
+        // 3. Strip all physical spaces for a pure structural+text sequence
+        $fingerprint_rendered = preg_replace('/\s+/', '', $fingerprint_rendered);
+        $fingerprint_target   = preg_replace('/\s+/', '', $fingerprint_target);
         
         $debug_log[] = [
             'blockName' => $block['blockName'],
@@ -2315,10 +2501,10 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
             if ( $found_inside ) return $found_inside;
         }
 
-        // 2. Direct match
+        // 2. Direct match (Typography normalized)
         if ( strpos( $norm_rendered, $norm_target ) !== false ) return $block;
         
-        // 3. Fallback: Structural check
+        // 3. Fallback: Structural check (Extremely robust to browser DOM mutations)
         if ( strpos( $fingerprint_rendered, $fingerprint_target ) !== false ) return $block;
     }
 

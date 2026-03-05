@@ -331,3 +331,43 @@
 .aipg-exit-btn svg {
     display: block;
 }
+
+/* Hierarchical Hover Outlines */
+.aipg-outline-box {
+    position: absolute;
+    pointer-events: none;
+    z-index: 99990;
+    transition: all 0.15s ease;
+    border-radius: 2px;
+}
+
+.aipg-outline-parent-2 {
+    border: 2px dotted rgba(230, 126, 34, 0.4) !important;
+    transform: translate(-4px, -4px);
+    padding: 4px;
+    /* Expand outwards */
+    z-index: 99990;
+}
+
+.aipg-outline-parent-1 {
+    border: 2px dashed rgba(230, 126, 34, 0.8) !important;
+    transform: translate(-2px, -2px);
+    padding: 2px;
+    z-index: 99991;
+}
+
+.aipg-outline-child-1 {
+    border: 1.5px dashed rgba(52, 152, 219, 0.9) !important;
+    transform: translate(2px, 2px);
+    width: calc(100% - 4px) !important;
+    height: calc(100% - 4px) !important;
+    z-index: 99992;
+}
+
+.aipg-outline-child-2 {
+    border: 1px dotted rgba(52, 152, 219, 0.6) !important;
+    transform: translate(4px, 4px);
+    width: calc(100% - 8px) !important;
+    height: calc(100% - 8px) !important;
+    z-index: 99993;
+}
