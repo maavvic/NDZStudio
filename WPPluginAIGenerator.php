@@ -174,8 +174,15 @@ function aipg_enqueue_studio_editor() {
     // Check if this is an AI Studio generated page
     if ( ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
+    // Base Editor scripts
     wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
     wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], AIPG_VERSION, true );
+
+    // Enqueue CSS Reset if Theme Strategy falls back to Add to Existing
+    $theme_strategy = get_option( 'aipg_studio_theme_strategy', 'normalize_css' );
+    if ( $theme_strategy === 'normalize_css' ) {
+        wp_enqueue_style( 'aipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], AIPG_VERSION );
+    }
 
     wp_localize_script( 'aipg-studio-editor-script', 'aipg_editor_vars', [
         'ajaxurl'    => admin_url( 'admin-ajax.php' ),
@@ -1699,6 +1706,7 @@ function aipg_ajax_install_prototype() {
 
     $raw_response = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $project_id   = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
+    $theme_strategy = isset( $_POST['theme_strategy'] ) ? sanitize_text_field( wp_unslash( $_POST['theme_strategy'] ) ) : 'normalize_css';
     $data = json_decode( $raw_response, true );
 
     if ( ! $data || ! isset( $data['pages'] ) ) {
@@ -1838,6 +1846,53 @@ function aipg_ajax_install_prototype() {
          update_option( 'aipg_studio_active_project', $project_id );
     }
 
+    // Handle Theme Strategy
+    update_option( 'aipg_studio_theme_strategy', $theme_strategy );
+    
+    if ( $theme_strategy === 'blank_theme' ) {
+        $theme_dir = get_theme_root() . '/wpgenerator-blank';
+        if ( ! file_exists( $theme_dir ) ) {
+            wp_mkdir_p( $theme_dir );
+            
+            // Create style.css
+            $style_css = "/*\nTheme Name: WPGenerator Blank\nAuthor: AI Studio\nDescription: A completely blank, FSE-compatible theme designed as a canvas for AI Generator.\nVersion: 1.0\nRequires at least: 6.0\nTested up to: 6.5\n*/\n";
+            file_put_contents( trailingslashit($theme_dir) . 'style.css', $style_css );
+            
+            // Create index.php
+            file_put_contents( trailingslashit($theme_dir) . 'index.php', "<?php\n// Silence is golden.\n" );
+
+            // Minimal theme.json to enable FSE
+            $theme_json = [
+                "version" => 2,
+                "settings" => [
+                    "appearanceTools" => true,
+                    "layout" => [
+                        "contentSize" => "800px",
+                        "wideSize" => "1200px"
+                    ]
+                ]
+            ];
+            file_put_contents( trailingslashit($theme_dir) . 'theme.json', wp_json_encode($theme_json) );
+
+            // Create FSE Templates
+            $templates_dir = trailingslashit($theme_dir) . 'templates';
+            wp_mkdir_p( $templates_dir );
+            
+            $index_html = '<!-- wp:template-part {"slug":"header"} /-->
+<!-- wp:group {"tagName":"main","align":"full","layout":{"type":"constrained"}} -->
+<main class="wp-block-group alignfull">
+<!-- wp:post-content {"layout":{"type":"constrained"}} /-->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->';
+            
+            file_put_contents( trailingslashit($templates_dir) . 'index.html', $index_html );
+        }
+        
+        switch_theme( 'wpgenerator-blank' );
+        error_log( '[AI Studio] Activated Blank Theme (wpgenerator-blank).' );
+    }
+
     wp_send_json_success([
         'message'     => 'Real Gutenberg pages installed!',
         'preview_url' => add_query_arg( '_aipg_preview', time(), home_url('/') )
@@ -1849,12 +1904,48 @@ function aipg_ajax_install_prototype() {
  */
 add_filter( 'get_block_template', 'aipg_override_fse_template_parts', 10, 3 );
 function aipg_override_fse_template_parts( $block_template, $id, $template_type ) {
+    $active_theme = wp_get_theme()->get_stylesheet();
+
+    // 1. Full Page Overrides
+    if ( $template_type === 'wp_template' ) {
+        // If we are currently querying one of our AI-generated pages
+        $post_id = get_queried_object_id();
+        $is_ai = $post_id ? get_post_meta( $post_id, '_aipg_studio_page', true ) : false;
+        error_log("[AI Studio Template] Checking wp_template override for ID: {$id}. Object ID: " . ($post_id ?: 'NONE') . ". Is AI: " . ($is_ai ? 'YES' : 'NO'));
+        
+        if ( $post_id && $is_ai ) {
+            if ( ! $block_template ) {
+                $block_template = new WP_Block_Template();
+                $block_template->id = $active_theme . '//aipg-blank';
+                $block_template->theme = $active_theme;
+                $block_template->slug = 'aipg-blank';
+                $block_template->source = 'custom';
+                $block_template->type = 'wp_template';
+            }
+            
+            // Serve a blank layout without the disruptive "Front Page" post titles or forced constrained margins
+            $block_template->content = '<!-- wp:template-part {"slug":"header"} /-->
+<!-- wp:group {"tagName":"main","align":"full","layout":{"type":"default"},"style":{"spacing":{"margin":{"top":"0"}}}} -->
+<main class="wp-block-group alignfull" style="margin-top:0">
+<!-- wp:post-content {"layout":{"type":"default"}} /-->
+</main>
+<!-- /wp:group -->
+<!-- wp:template-part {"slug":"footer"} /-->';
+            
+            $block_template->title = 'AI Studio Blank';
+            $block_template->status = 'publish';
+            $block_template->has_theme_file = false;
+            $block_template->is_custom = true;
+            return $block_template;
+        }
+    }
+
+    // 2. Template Part Overrides (Headers/Footers)
     if ( $template_type !== 'wp_template_part' ) {
         return $block_template;
     }
     
     // Extract slug from ID (e.g., 'twentytwentyfour//header' -> 'header')
-    $active_theme = wp_get_theme()->get_stylesheet();
     $slug = str_replace( $active_theme . '//', '', $id );
 
     // Normalize slug to catch variations like 'footer-default' or 'header-dark'

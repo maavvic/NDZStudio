@@ -10,6 +10,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
     const WPStudioWizard = {
         currentStep: 0,
         data: {
+            themeStrategy: '',
             siteName: '',
             industry: '',
             style: '',
@@ -23,6 +24,30 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
         },
 
         steps: [
+            {
+                title: 'Foundation Approach',
+                subtitle: 'How would you like to build your new AI-powered pages?',
+                render: function () {
+                    return `
+                        <div class="ws-option-grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div class="ws-option-card ${WPStudioWizard.data.themeStrategy === 'blank_theme' ? 'active' : ''}" data-id="blank_theme" style="padding: 30px; text-align: left;">
+                                <div style="font-size: 32px; margin-bottom: 15px;">✨</div>
+                                <h3 style="margin: 0 0 10px 0; font-size: 18px;">Start from Scratch (Recommended)</h3>
+                                <p style="color: var(--ws-text-secondary); font-size: 14px; line-height: 1.5; margin: 0;">We will install a clean, blank WordPress theme to guarantee 100% pixel-perfect design fidelity. Best for new projects.</p>
+                            </div>
+                            <div class="ws-option-card ${WPStudioWizard.data.themeStrategy === 'normalize_css' ? 'active' : ''}" data-id="normalize_css" style="padding: 30px; text-align: left;">
+                                <div style="font-size: 32px; margin-bottom: 15px;">🧩</div>
+                                <h3 style="margin: 0 0 10px 0; font-size: 18px;">Add to Existing Website</h3>
+                                <p style="color: var(--ws-text-secondary); font-size: 14px; line-height: 1.5; margin: 0;">Keep your current theme. We will try our best to normalize margins and padding on AI pages to prevent conflicts.</p>
+                            </div>
+                        </div>
+                    `;
+                },
+                validate: function () {
+                    if (!WPStudioWizard.data.themeStrategy) return 'Please select how you want to build your site.';
+                    return true;
+                }
+            },
             {
                 title: 'The Canvas of Your Vision',
                 subtitle: 'Every masterpiece begins with a name. How shall we call your site?',
@@ -344,8 +369,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 const id = $(this).data('id');
                 const step = self.steps[self.currentStep];
 
-                if (self.currentStep === 1) self.data.industry = id;
-                if (self.currentStep === 2) self.data.style = id;
+                if (self.currentStep === 0) self.data.themeStrategy = id;
+                if (self.currentStep === 2) self.data.industry = id;
+                if (self.currentStep === 3) self.data.style = id;
 
                 $('.ws-option-card').removeClass('active');
                 $(this).addClass('active');
@@ -484,7 +510,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         action: 'aipg_install_prototype',
                         nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                         code: res.data.response,
-                        template_name: template.name
+                        template_name: template.name,
+                        theme_strategy: self.data.themeStrategy
                     }, function (installRes) {
                         if (installRes.success) {
                             self.showSuccess(installRes.data.preview_url);
@@ -662,7 +689,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 code: code,
                 template_name: name,
-                project_id: project_id
+                project_id: project_id,
+                theme_strategy: self.data.themeStrategy
             }, function (res) {
                 if (res.success) {
                     $status.show().html(`
