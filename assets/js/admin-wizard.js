@@ -13,6 +13,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             themeStrategy: '',
             siteName: '',
             industry: '',
+            brief: '',
             style: '',
             pages: [],
             palette: {
@@ -85,7 +86,14 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         { id: 'ecommerce', title: 'Online Store', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' },
                         { id: 'portfolio', title: 'Portfolio / Creator', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' },
                         { id: 'blog', title: 'Blog / Magazine', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
-                        { id: 'restaurant', title: 'Food & Drink', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>' }
+                        { id: 'restaurant', title: 'Food & Drink', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>' },
+                        { id: 'realestate', title: 'Real Estate', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' },
+                        { id: 'health', title: 'Health & Wellness', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>' },
+                        { id: 'education', title: 'Education / Course', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>' },
+                        { id: 'agency', title: 'Agency / Consulting', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>' },
+                        { id: 'local', title: 'Local Service', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>' },
+                        { id: 'charity', title: 'Charity / NGO', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z"/><path d="M12 5.5s.5-3 3-3c2 0 3.5 1.5 3.5 3.5 0 2.5-3.5 6.5-6.5 9.5-3-3-6.5-7-6.5-9.5 0-2 1.5-3.5 3.5-3.5 2.5 0 3 3 3 3z"/></svg>' },
+                        { id: 'saas', title: 'Tech / SaaS', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>' }
                     ];
                     return `
                         <div class="ws-option-grid">
@@ -104,6 +112,24 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 }
             },
             {
+                title: 'Let\'s Write Your Brief',
+                subtitle: 'Give the AI some context so it can generate exactly what you need.',
+                render: function () {
+                    return `
+                        <div class="ws-form-group">
+                            <label class="ws-label">What is the primary goal of your website?</label>
+                            <textarea id="ws-brief-input" class="ws-input" rows="4" placeholder="e.g. My goal is to sell cupcakes and take online orders...">${WPStudioWizard.data.brief}</textarea>
+                        </div>
+                    `;
+                },
+                validate: function () {
+                    const val = $('#ws-brief-input').val().trim();
+                    if (!val) return 'Please tell us a bit about your website goal.';
+                    WPStudioWizard.data.brief = val;
+                    return true;
+                }
+            },
+            {
                 title: 'The Visual Signature',
                 subtitle: 'Select an aesthetic soul for your brand.',
                 render: function () {
@@ -111,7 +137,15 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         { id: 'minimal', title: 'Minimalist', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>' },
                         { id: 'modern', title: 'Modern', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4.43a1.67 1.67 0 0 1 2.4 0L9 8z"></path><path d="M12 15v5s3.03-.55 4.43-2.03a1.67 1.67 0 0 0 0-2.43L16 15z"></path></svg>' },
                         { id: 'classic', title: 'Classic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
-                        { id: 'bold', title: 'Bold & Vibrant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' }
+                        { id: 'bold', title: 'Bold & Vibrant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
+                        { id: 'luxury', title: 'Luxury & Elegant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>' },
+                        { id: 'tech', title: 'Tech & Futuristic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' },
+                        { id: 'organic', title: 'Organic & Natural', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8a8 8 0 0 1-10 10z"></path></svg>' },
+                        { id: 'brutalist', title: 'Brutalist Raw', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>' },
+                        { id: 'retro', title: 'Retro / Vintage', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M12 8l-4 4 4 4M16 12H8"></path></svg>' },
+                        { id: 'industrial', title: 'Industrial / Loft', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M3 9h18M9 21V9"></path></svg>' },
+                        { id: 'playful', title: 'Playful & Fun', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>' },
+                        { id: 'dark', title: 'Dark / Night', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' }
                     ];
                     return `
                         <div class="ws-option-grid">
@@ -131,89 +165,180 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             },
             {
                 title: 'Color Foundations',
-                subtitle: 'Choose a primary palette that resonates with your brand.',
+                subtitle: 'Choose a primary palette or build your own with AI assistance.',
                 render: function () {
+                    const self = WPStudioWizard;
                     const palettes = [
                         { label: 'Onyx & Gold', colors: ['#1a1a1a', '#d4af37', '#ffffff'] },
                         { label: 'Ocean Breeze', colors: ['#0077b6', '#90e0ef', '#caf0f8'] },
                         { label: 'Nordic Forest', colors: ['#2d6a4f', '#74c69d', '#d8f3dc'] },
                         { label: 'Berry Bliss', colors: ['#800f2f', '#ff4d6d', '#fff0f3'] },
                         { label: 'Cyber Punk', colors: ['#130f40', '#f0932b', '#eb4d4b'] },
-                        { label: 'Zen Minimal', colors: ['#3d405b', '#e07a5f', '#f4f1de'] }
+                        { label: 'Zen Minimal', colors: ['#3d405b', '#e07a5f', '#f4f1de'] },
+                        { label: 'Midnight Gold', colors: ['#000000', '#FFD700', '#F5F5F5'] },
+                        { label: 'Emerald City', colors: ['#064e3b', '#10b981', '#ecfdf5'] },
+                        { label: 'Sunset Glow', colors: ['#4c1d95', '#f43f5e', '#fff1f2'] },
+                        { label: 'Deep Sea', colors: ['#0c4a6e', '#0ea5e9', '#f0f9ff'] },
+                        { label: 'Rustic Autumn', colors: ['#78350f', '#f59e0b', '#fffbeb'] },
+                        { label: 'Slate Tech', colors: ['#0f172a', '#64748b', '#f8fafc'] },
+                        { label: 'Forest Edge', colors: ['#14532d', '#22c55e', '#f0fdf4'] },
+                        { label: 'Royal Velvet', colors: ['#581c87', '#a855f7', '#faf5ff'] },
+                        { label: 'Desert Rose', colors: ['#881337', '#fb7185', '#fff1f2'] },
+                        { label: 'Industrial Ash', colors: ['#27272a', '#71717a', '#f4f4f5'] },
+                        { label: 'Tropical Teal', colors: ['#134e4a', '#14b8a6', '#f0fdfa'] },
+                        { label: 'Vintage Wine', colors: ['#4c0519', '#be123c', '#fff1f2'] },
+                        { label: 'Modern Graphite', colors: ['#18181b', '#52525b', '#fafafa'] },
+                        { label: 'Minty Fresh', colors: ['#065f46', '#34d399', '#f0fdfa'] },
+                        { label: 'Amber Warmth', colors: ['#92400e', '#fbbf24', '#fffbeb'] },
+                        { label: 'Shadow Cobalt', colors: ['#1e3a8a', '#3b82f6', '#eff6ff'] },
+                        { label: 'Crimson Night', colors: ['#7f1d1d', '#ef4444', '#fef2f2'] },
+                        { label: 'Golden Orchid', colors: ['#4c1d95', '#8b5cf6', '#ede9fe'] },
+                        { label: 'Deep Moss', colors: ['#064e3b', '#65a30d', '#f7fee7'] },
+                        { label: 'Slate Blue', colors: ['#1e1b4b', '#4338ca', '#eef2ff'] },
+                        { label: 'Burnt Sienna', colors: ['#431407', '#ea580c', '#fff7ed'] },
+                        { label: 'Charcoal Sky', colors: ['#171717', '#404040', '#ededed'] },
+                        { label: 'Emerald Isle', colors: ['#14532d', '#16a34a', '#f0fdf4'] },
+                        { label: 'Electric Indigo', colors: ['#312e81', '#6366f1', '#e0e7ff'] },
+                        { label: 'Warm Espresso', colors: ['#422006', '#d97706', '#fffbeb'] },
+                        { label: 'Nordic Snow', colors: ['#0f172a', '#94a3b8', '#f1f5f9'] },
+                        { label: 'Plum Passion', colors: ['#4c1d95', '#c084fc', '#faf5ff'] },
+                        { label: 'Icy Arctic', colors: ['#082f49', '#0ea5e9', '#f0f9ff'] },
+                        { label: 'Golden Hour', colors: ['#7c2d12', '#f97316', '#fff7ed'] },
+                        { label: 'Olive Branch', colors: ['#365314', '#a3e635', '#f7fee7'] },
+                        { label: 'Deep Navy', colors: ['#172554', '#2563eb', '#eff6ff'] },
+                        { label: 'Rose Quartz', colors: ['#4c0519', '#fb7185', '#fff1f2'] },
+                        { label: 'Steel Grey', colors: ['#111827', '#4b5563', '#f3f4f6'] },
+                        { label: 'Turquoise Gem', colors: ['#134e4a', '#2dd4bf', '#f0fdfa'] },
+                        { label: 'Violet Dusk', colors: ['#1e1b4b', '#7c3aed', '#f5f3ff'] },
+                        { label: 'Peach Sorbet', colors: ['#7c2d12', '#fb923c', '#fff7ed'] },
+                        { label: 'Sage Garden', colors: ['#14532d', '#4ade80', '#f0fdf4'] },
+                        { label: 'Cloud Blue', colors: ['#1e3a8a', '#60a5fa', '#eff6ff'] },
+                        { label: 'Velvet Maroon', colors: ['#450a0a', '#dc2626', '#fef2f2'] },
+                        { label: 'Mystic Purple', colors: ['#2e1065', '#a855f7', '#faf5ff'] },
+                        { label: 'Lime Burst', colors: ['#064e3b', '#84cc16', '#f7fee7'] },
+                        { label: 'Classic Blue', colors: ['#1e3a8a', '#3b82f6', '#eff6ff'] },
+                        { label: 'Sunset Orange', colors: ['#7c2d12', '#f97316', '#fff7ed'] },
+                        { label: 'Deep Mauve', colors: ['#4c1d95', '#d8b4fe', '#faf5ff'] },
+                        { label: 'Ocean Tide', colors: ['#0c4a6e', '#38bdf8', '#f0f9ff'] },
+                        { label: 'Earthy Clay', colors: ['#431407', '#d97706', '#fffbeb'] },
+                        { label: 'Cool Mint', colors: ['#065f46', '#6ee7b7', '#f0fdf4'] },
+                        { label: 'Midnight Blue', colors: ['#1e1b4b', '#4f46e5', '#eef2ff'] },
+                        { label: 'Warm Toffee', colors: ['#422006', '#f59e0b', '#fffbeb'] },
+                        { label: 'Soft Lavender', colors: ['#2e1065', '#c084fc', '#faf5ff'] },
+                        { label: 'Arctic Ice', colors: ['#082f49', '#7dd3fc', '#f0f9ff'] },
+                        { label: 'Harvest Gold', colors: ['#713f12', '#eab308', '#fefce8'] },
+                        { label: 'Deep Emerald', colors: ['#064e3b', '#10b981', '#ecfdf5'] },
+                        { label: 'Shadow Indigo', colors: ['#312e81', '#4338ca', '#eef2ff'] },
+                        { label: 'Copper Glow', colors: ['#431407', '#f97316', '#fff7ed'] },
+                        { label: 'Grey Mist', colors: ['#18181b', '#a1a1aa', '#fafafa'] },
+                        { label: 'Seafoam Green', colors: ['#134e4a', '#5eead4', '#f0fdfa'] },
+                        { label: 'Regal Magenta', colors: ['#4c0519', '#e11d48', '#fff1f2'] },
+                        { label: 'Tech Silver', colors: ['#0f172a', '#cbd5e1', '#f8fafc'] },
+                        { label: 'Fresh Apple', colors: ['#14532d', '#86efac', '#f0fdf4'] },
+                        { label: 'Deep Orchid', colors: ['#581c87', '#d8b4fe', '#faf5ff'] },
+                        { label: 'Salmon Sky', colors: ['#7c2d12', '#fda4af', '#fff1f2'] },
+                        { label: 'Charcoal Dust', colors: ['#27272a', '#d4d4d8', '#f4f4f5'] },
+                        { label: 'Electric Lime', colors: ['#1a2e05', '#bef264', '#f7fee7'] },
+                        { label: 'Deep Ruby', colors: ['#45062e', '#e11d48', '#fff1f2'] },
+                        { label: 'Polar Night', colors: ['#020617', '#38bdf8', '#f8fafc'] }
                     ];
                     return `
-                        <div class="ws-palette-grid" id="ws-base-palettes">
-                            ${palettes.map((p, idx) => `
-                                <div class="ws-palette-card ${JSON.stringify(WPStudioWizard.data.palette.base) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
-                                    <div class="ws-swatch-container">
-                                        ${p.colors.map(c => `<div class="ws-swatch" style="background:${c}"></div>`).join('')}
-                                    </div>
-                                    <div class="ws-palette-label">${p.label}</div>
+                        <div class="ws-palette-gallery-container infinite-gallery" style="position:relative; margin-bottom: 30px;">
+                            <div class="ws-carousel-wrapper">
+                                <button type="button" class="ws-carousel-btn prev" onclick="WPStudioWizard.scrollCarousel('ws-base-palettes', 'prev')">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                </button>
+                                <div class="ws-carousel-viewport ws-palette-grid-carousel-3x3" id="ws-base-palettes">
+                                    ${palettes.map((p, idx) => `
+                                        <div class="ws-palette-card ${JSON.stringify(WPStudioWizard.data.palette.base) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
+                                            <div class="ws-swatch-container">
+                                                ${p.colors.map(c => `<div class="ws-swatch" style="background:${c}"></div>`).join('')}
+                                            </div>
+                                            <div class="ws-palette-label">${p.label}</div>
+                                        </div>
+                                    `).join('')}
                                 </div>
-                            `).join('')}
-                        </div>
-                        <div class="ws-custom-color-box">
-                            <label class="ws-label">Or Pick a Custom Brand Color</label>
-                            <div class="ws-color-input-wrapper">
-                                <input type="color" id="ws-custom-color" class="ws-color-picker" value="${WPStudioWizard.data.palette.base[0] || '#d94e28'}">
-                                <button class="ws-btn ws-btn-secondary" id="ws-btn-ai-suggest">Ask AI to Generate Palette</button>
+                                <button type="button" class="ws-carousel-btn next" onclick="WPStudioWizard.scrollCarousel('ws-base-palettes', 'next')">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
                             </div>
+                        </div>
+
+                        <div class="ws-custom-color-panel">
+                            <div class="ws-custom-color-header">
+                                <label class="ws-label">Smart Color Picker</label>
+                                <span class="ws-custom-color-desc">Pick your brand color and use "Match" to let AI find the perfect secondary and accent colors.</span>
+                            </div>
+                            
+                            <div class="ws-custom-colors-container">
+                                <div class="ws-color-picker-group">
+                                    <span class="ws-color-picker-label">Primary / Background</span>
+                                    <div class="ws-color-picker-wrapper">
+                                        <input type="color" id="ws-custom-color-1" class="ws-color-picker-input" value="${WPStudioWizard.data.palette.base[0] || '#ffffff'}">
+                                    </div>
+                                </div>
+                                
+                                <div class="ws-color-picker-group">
+                                    <div class="ws-picker-label-row">
+                                        <span class="ws-color-picker-label">Secondary / Text</span>
+                                        <button type="button" class="ws-btn-ai-match" onclick="WPStudioWizard.matchColor(2)" id="ws-match-btn-2">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> 
+                                            <span>Suggest with AI</span>
+                                        </button>
+                                    </div>
+                                    <div class="ws-color-picker-wrapper">
+                                        <input type="color" id="ws-custom-color-2" class="ws-color-picker-input" value="${WPStudioWizard.data.palette.base[1] || '#1a1a1a'}">
+                                    </div>
+                                </div>
+                                
+                                <div class="ws-color-picker-group">
+                                    <div class="ws-picker-label-row">
+                                        <span class="ws-color-picker-label">Accent / Buttons</span>
+                                        <button type="button" class="ws-btn-ai-match" onclick="WPStudioWizard.matchColor(3)" id="ws-match-btn-3">
+                                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> 
+                                            <span>Suggest with AI</span>
+                                        </button>
+                                    </div>
+                                    <div class="ws-color-picker-wrapper">
+                                        <input type="color" id="ws-custom-color-3" class="ws-color-picker-input" value="${WPStudioWizard.data.palette.base[2] || '#0071e3'}">
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div id="ai-loading-indicator" style="display:none;" class="ws-ai-loading">
-                                <div class="ws-mini-spinner"></div> Generating harmonious options...
+                                <div class="ws-mini-spinner"></div> AI is finding the perfect match...
                             </div>
-                        </div>
-                    `;
-                },
-                validate: function () {
-                    if (WPStudioWizard.data.palette.base.length === 0) return 'Please select a base palette or define a custom color.';
-                    return true;
-                }
-            },
-            {
-                title: 'Atmospheric Variations',
-                subtitle: 'Fine-tune the mood. Which variation feels most authentic?',
-                render: function () {
-                    const self = WPStudioWizard;
-                    if (!self.aiOptions || self.aiOptions.length === 0) {
-                        if (self.data.error) {
-                            return `<div class="ws-error-container"><div class="ws-error-message">${self.data.error}</div><button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="WPStudioWizard.retry()">Retry AI</button></div>`;
-                        }
-                        return '<div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Loading variations...</div>';
-                    }
-                    return `
-                        <div class="ws-palette-grid">
-                            ${self.aiOptions.map((p, idx) => `
-                                <div class="ws-palette-card variation ${JSON.stringify(self.data.palette.variation) === JSON.stringify(p.colors) ? 'active' : ''}" data-idx="${idx}" data-colors='${JSON.stringify(p.colors)}'>
-                                    <div class="ws-swatch-container">
-                                        ${p.colors.map(c => `<div class="ws-swatch" style="background:${c}"></div>`).join('')}
-                                    </div>
-                                    <div class="ws-palette-label">${p.label}</div>
-                                </div>
-                            `).join('')}
                         </div>
                     `;
                 },
                 onEnter: function () {
-                    const self = WPStudioWizard;
-                    if (self.isFetching) return;
-                    if (!self.aiOptions || self.lastBase !== JSON.stringify(self.data.palette.base)) {
-                        self.fetchAiOptions(2);
-                    }
+                    // No AI fetch needed for base gallery anymore
                 },
                 validate: function () {
-                    if (WPStudioWizard.data.palette.variation.length === 0) return 'Please select a variation.';
+                    if (WPStudioWizard.data.palette.base.length === 0) return 'Please select a palette.';
+                    // Sync custom colors before proceeding
+                    const c1 = $('#ws-custom-color-1').val();
+                    const c2 = $('#ws-custom-color-2').val();
+                    const c3 = $('#ws-custom-color-3').val();
+                    WPStudioWizard.data.palette.base = [c1, c2, c3];
+                    WPStudioWizard.data.palette.variation = [c1, c2, c3]; // Use same for variation since we merged
                     return true;
                 }
             },
             {
                 title: 'The Architectural Soul',
-                subtitle: 'Which structure speaks most to your vision? AI has prepared 3 bespoke concepts.',
+                subtitle: 'Which structure speaks most to your vision? AI has prepared bespoke concepts.',
                 render: function () {
                     if (WPStudioWizard.data.error) {
                         return `<div class="ws-error-container"><div class="ws-error-icon">⚠️</div><div class="ws-error-message">${WPStudioWizard.data.error}</div><button class="ws-btn ws-btn-secondary" onclick="WPStudioWizard.retry()">Try Again</button></div>`;
                     }
                     if (!WPStudioWizard.templates || WPStudioWizard.templates.length === 0) {
-                        return '<div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Architecting your options...</div>';
+                        const pct = WPStudioWizard.data.templateProgress || 0;
+                        const statusTxt = pct > 0 ? `Architecting your options... ${pct}%` : `AI is thinking and architecting...`;
+                        return `<div class="ws-ai-loading">
+                                    <div class="ws-mini-spinner"></div> 
+                                    <div id="ws-step5-status-text">${statusTxt}</div>
+                                </div>`;
                     }
                     return `
                         <div class="ws-template-grid">
@@ -237,8 +362,11 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                                             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                             View Website Preview
                                         </button>
-                                        <div class="ws-preview-status" style="display:none;">
-                                            <div class="ws-mini-spinner"></div> <span class="ws-status-text">Architecting...</span>
+                                        <div class="ws-preview-status" style="display:none; margin-top: 10px;">
+                                            <div style="font-size: 13px; color: var(--ws-text-secondary); margin-bottom: 5px;" class="ws-status-text">Allocating tokens...</div>
+                                            <div class="ws-progress-track" style="width:100%; height:6px; background: rgba(0,0,0,0.05); border-radius:3px; overflow:hidden;">
+                                                <div class="ws-progress-fill" style="width:0%; height:100%; background: var(--ws-primary); transition: width 0.3s ease;"></div>
+                                            </div>
                                         </div>
                                         <button class="ws-btn ws-btn-secondary ws-btn-save-project" data-idx="${idx}" style="margin-top:10px; width:100%; justify-content:center;">
                                             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -270,28 +398,33 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     const styleMap = { minimal: 'Minimalist', modern: 'Modern', classic: 'Classic', bold: 'Bold & Vibrant' };
                     const p = WPStudioWizard.data.palette.variation;
                     return `
-                                <div class="ws-summary-card" style="background: rgba(0, 113, 227, 0.05); padding: 30px; border-radius: 24px; text-align: left;">
-                                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 24px;">
+                                <div class="ws-summary-card" style="background: rgba(0, 113, 227, 0.02); padding: 40px; border-radius: 32px; border: 1px solid rgba(0,0,0,0.05); position: relative; overflow: hidden;">
+                                    <div style="position: absolute; top: -20px; right: -20px; font-size: 140px; opacity: 0.03; font-family: var(--ws-font-serif);">”</div>
+                                    
+                                    <h3 style="font-family: var(--ws-font-serif); font-size: 24px; margin-top: 0; margin-bottom: 24px; color: var(--ws-text);">The Master Brief</h3>
+                                    
+                                    <div class="ws-madlibs-brief" style="font-size: 20px; line-height: 1.8; color: var(--ws-text-secondary); margin-bottom: 30px;">
+                                        "I am building a <strong style="color:var(--ws-text); border-bottom: 2px solid var(--ws-primary); padding-bottom: 2px;">${industryMap[WPStudioWizard.data.industry] || WPStudioWizard.data.industry}</strong> 
+                                        website named <strong style="color:var(--ws-text); border-bottom: 2px solid var(--ws-primary); padding-bottom: 2px;">${WPStudioWizard.data.siteName}</strong>. 
+                                        I want to achieve a <strong style="color:var(--ws-text); border-bottom: 2px solid var(--ws-primary); padding-bottom: 2px;">${styleMap[WPStudioWizard.data.style] || WPStudioWizard.data.style}</strong> aesthetic 
+                                        using the <strong style="color:var(--ws-text); border-bottom: 2px solid var(--ws-primary); padding-bottom: 2px;">${WPStudioWizard.data.template ? WPStudioWizard.data.template.name : 'Selected Concept'}</strong> architecture."
+                                    </div>
+
+                                    <div style="background: #fff; border-radius: 20px; padding: 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.03);">
                                         <div>
-                                            <p style="margin-bottom:8px;"><strong>Website Name:</strong> ${WPStudioWizard.data.siteName}</p>
-                                            <p style="margin-bottom:8px;"><strong>Industry:</strong> ${industryMap[WPStudioWizard.data.industry] || WPStudioWizard.data.industry}</p>
-                                            <p style="margin-bottom:8px;"><strong>Visual Style:</strong> ${styleMap[WPStudioWizard.data.style] || WPStudioWizard.data.style}</p>
-                                            <p style="margin-bottom:8px;"><strong>Selected Concept:</strong> ${WPStudioWizard.data.template ? WPStudioWizard.data.template.name : 'None'}</p>
-                                        </div>
-                                        <div style="text-align:right">
-                                            <label class="ws-label">Your Palette</label>
-                                            <div class="ws-swatch-container" style="justify-content:flex-end; margin-top:10px;">
+                                            <label class="ws-mini-label" style="margin-bottom: 8px;">Selected Palette</label>
+                                            <div class="ws-swatch-container" style="justify-content: flex-start;">
                                                 ${p.map(c => `<div class="ws-swatch" style="background:${c}; width:40px; height:40px;"></div>`).join('')}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 20px;">
-                                        <strong>Structure Preview:</strong>
-                                        <div class="ws-page-chips" style="margin-top: 10px;">
-                                            ${WPStudioWizard.data.template ? WPStudioWizard.data.template.pages.map(pg => `<span class="ws-page-chip">${pg.title}</span>`).join('') : ''}
+                                        <div style="text-align: right;">
+                                            <label class="ws-mini-label" style="margin-bottom: 8px;">Generated Pages</label>
+                                            <div class="ws-page-chips" style="justify-content: flex-end;">
+                                                ${WPStudioWizard.data.template ? WPStudioWizard.data.template.pages.map(pg => `<span class="ws-page-chip" style="background: #f8fafc; border-color: transparent;">${pg.title}</span>`).join('') : ''}
+                                            </div>
                                         </div>
                                     </div>
-                                    <p style="margin-top: 24px; color: var(--ws-text-secondary); font-size: 15px;">Click "Generate Studio" to start the AI engine and build your custom WordPress environment.</p>
+                                    
                                 </div>
                     `;
                 },
@@ -374,7 +507,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
                 if (self.currentStep === 0) self.data.themeStrategy = id;
                 if (self.currentStep === 2) self.data.industry = id;
-                if (self.currentStep === 3) self.data.style = id;
+                if (self.currentStep === 4) self.data.style = id;
 
                 $('.ws-option-card').removeClass('active');
                 $(this).addClass('active');
@@ -388,7 +521,14 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     self.data.palette.variation = colors;
                 } else {
                     self.data.palette.base = colors;
-                    self.data.palette.variation = []; // Reset sub-choices
+                    self.data.palette.variation = [...colors];
+
+                    // Sync manual inputs for immediate feedback
+                    if (colors && colors.length >= 3) {
+                        $('#ws-custom-color-1').val(colors[0]);
+                        $('#ws-custom-color-2').val(colors[1]);
+                        $('#ws-custom-color-3').val(colors[2]);
+                    }
                 }
 
                 $this.parent().find('.ws-palette-card').removeClass('active');
@@ -411,9 +551,15 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             });
 
             $(document).on('click', '#ws-btn-ai-suggest', function () {
-                const baseColor = $('#ws-custom-color').val();
-                self.data.palette.base = [baseColor, '#ffffff', '#000000']; // Temporary base
-                self.fetchAiOptions(1, baseColor);
+                const c1 = $('#ws-custom-color-1').val();
+                const c2 = $('#ws-custom-color-2').val();
+                const c3 = $('#ws-custom-color-3').val();
+                let selectedCols = [c1, c2, c3];
+                // Fallback to ensuring at least one color is passed
+                if (!c1) selectedCols = ['#d94e28', '#ffffff', '#000000'];
+
+                self.data.palette.base = selectedCols;
+                self.fetchAiOptions(3, selectedCols); // Using fine-tuning step 3 for the 36 variations
             });
 
             $(document).on('click', '#ws-next', function () {
@@ -492,6 +638,11 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     <div class="aipg-spinner"></div>
                     <h2 class="ws-title">Architecting Your Studio...</h2>
                     <p class="ws-subtitle" id="ws-finish-status">Our AI is now crafting your multi-page website based on the "${template.name}" concept.</p>
+                    
+                    <div class="ws-progress-container" style="width: 100%; max-width: 400px; background: rgba(0,0,0,0.05); height: 8px; border-radius: 4px; margin: 20px auto; overflow: hidden;" id="ws-finish-progress-bar">
+                        <div id="ws-finish-progress-fill" style="width: 0%; height: 100%; background: var(--ws-primary); transition: width 0.5s ease;"></div>
+                    </div>
+                    <p id="ws-finish-percentage" style="font-weight: 600; color: var(--ws-primary); font-size: 14px; margin-top: 10px;">0%</p>
                 </div>
             `);
 
@@ -502,6 +653,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
+                brief: self.data.brief,
                 palette: self.data.palette.variation
             };
 
@@ -509,35 +661,81 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 url: ajaxurl,
                 type: 'POST',
                 data: payload,
-                timeout: 1500000, // 25 minutes timeout
+                timeout: 30000,
                 success: function (res) {
-                    if (res.success && res.data.status === 'COMPLETED') {
-                        $('#ws-finish-status').text('Installing your custom WordPress environment...');
-
-                        $.post(ajaxurl, {
-                            action: 'aipg_install_prototype',
-                            nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
-                            code: res.data.response,
-                            template_name: template.name,
-                            theme_strategy: self.data.themeStrategy
-                        }, function (installRes) {
-                            if (installRes.success) {
-                                self.showSuccess(installRes.data.preview_url);
-                            } else {
-                                self.showError('Installation failed: ' + installRes.data);
-                            }
-                        });
+                    if (res.success && res.data.job_id) {
+                        self.pollStudioJob(res.data.job_id);
+                    } else if (res.success && res.data.status === 'COMPLETED') {
+                        // Instant completion fallback
+                        self.installArchitecture(res.data.response, template.name);
                     } else {
-                        const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
-                        self.showError('Generation failed: ' + errorMsg + ' Please try again in 30 seconds.', true);
+                        const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy.';
+                        self.showError('Generation initiation failed: ' + errorMsg, true);
                     }
                 },
-                error: function (jqXHR, textStatus) {
-                    const status = jqXHR.status;
-                    let msg = 'Connection error during final generation.';
-                    if (status === 0) msg += ' (Check if your backend is running at http://localhost:8000)';
-                    if (status === 504 || textStatus === 'timeout') msg += ' (Gateway Timeout - The AI took too long)';
-                    self.showError(msg, true);
+                error: function (jqXHR) {
+                    self.showError('Connection error while initiating generation.', true);
+                }
+            });
+        },
+
+        pollStudioJob: function (jobId) {
+            const self = this;
+            const template = this.data.template;
+
+            $.post(ajaxurl, {
+                action: 'aipg_check_studio_generation_status',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                job_id: jobId
+            }, function (res) {
+                if (res.success) {
+                    const status = res.data.status;
+                    const tokens = res.data.completion_tokens || 0;
+
+                    // Use 20,000 tokens as the baseline for 100% of a full layout archetype
+                    let percent = tokens > 0 ? Math.min(99, Math.round((tokens / 20000) * 100)) : 0;
+
+                    if (status === 'COMPLETED') {
+                        $('#ws-finish-progress-fill').css('width', '100%');
+                        $('#ws-finish-percentage').text('100%');
+                        $('#ws-finish-status').text('Installing your custom WordPress environment...');
+                        self.installArchitecture(res.data.response, template.name);
+                    } else if (status === 'FAILED') {
+                        self.showError('AI Generation failed. The server might be overloaded or returned invalid data.', true);
+                    } else {
+                        // Still processing
+                        $('#ws-finish-progress-fill').css('width', percent + '%');
+                        $('#ws-finish-percentage').text(percent + '%');
+
+                        // Dynamic status updates
+                        if (tokens === 0) $('#ws-finish-status').text('AI is thinking and architecting the concept...');
+                        else if (percent > 80) $('#ws-finish-status').text('Finalizing the multi-page structure...');
+                        else if (percent > 40) $('#ws-finish-status').text('Generating block content and layouts...');
+                        else $('#ws-finish-status').text('Streaming visual vision from AI...');
+
+                        setTimeout(() => self.pollStudioJob(jobId), 3000);
+                    }
+                } else {
+                    console.error('[Wizard] Polling error:', res.data);
+                    // Silent retry for network blips
+                    setTimeout(() => self.pollStudioJob(jobId), 5000);
+                }
+            });
+        },
+
+        installArchitecture: function (code, templateName) {
+            const self = this;
+            $.post(ajaxurl, {
+                action: 'aipg_install_prototype',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                code: code,
+                template_name: templateName,
+                theme_strategy: self.data.themeStrategy
+            }, function (installRes) {
+                if (installRes.success) {
+                    self.showSuccess(installRes.data.preview_url);
+                } else {
+                    self.showError('Installation failed: ' + installRes.data);
                 }
             });
         },
@@ -583,6 +781,25 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             `);
         },
 
+        scrollCarousel: function (id, direction) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const scrollAmount = el.clientWidth;
+            if (direction === 'next') {
+                if (Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth) {
+                    el.scrollTo({ left: 0, behavior: 'smooth' });
+                } else {
+                    el.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+                }
+            } else {
+                if (el.scrollLeft <= 0) {
+                    el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+                } else {
+                    el.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+                }
+            }
+        },
+
         fetchAiOptions: function (step, baseColor = null) {
             const self = this;
             if (this.isFetching) return;
@@ -591,6 +808,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const payload = {
                 step: step,
                 base_color: baseColor,
+                count: 72,
                 current_palette: step === 2 ? self.data.palette.base : null
             };
 
@@ -604,10 +822,15 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 if (step === 1) {
                     $('#ai-loading-indicator').hide();
                     if (res.options && res.options.length > 0) {
-                        self.data.palette.base = res.options[0].colors;
+                        self.baseOptions = res.options;
+                        // Pre-select the first one if none selected
+                        if (!self.data.palette.base || self.data.palette.base.length === 0) {
+                            self.data.palette.base = res.options[0].colors;
+                            self.data.palette.variation = res.options[0].colors;
+                        }
                         self.render();
                     }
-                } else if (step === 2) {
+                } else {
                     self.aiOptions = res.options;
                     self.lastBase = JSON.stringify(self.data.palette.base);
                     self.render();
@@ -622,29 +845,133 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             });
         },
 
+        matchColor: function (targetStep) {
+            const self = this;
+            const c1 = $('#ws-custom-color-1').val();
+            const c2 = $('#ws-custom-color-2').val();
+
+            let currentColors = targetStep === 2 ? [c1] : [c1, c2];
+
+            const $btn = $(`#ws-match-btn-${targetStep}`);
+            const originalHtml = $btn.html();
+            $btn.html('<div class="ws-mini-spinner" style="width:12px; height:12px; border-width:2px; margin-right:5px;"></div> Suggesting...').prop('disabled', true);
+
+            this.callAiStudio('match-colors', { current_colors: currentColors }).then(res => {
+                console.log('[Wizard] AI Color Match Result:', res);
+                $btn.html(originalHtml).prop('disabled', false);
+
+                if (res && res.suggested_color) {
+                    let color = res.suggested_color.trim().toLowerCase(); // MUST be lowercase for type="color"
+                    if (!color.startsWith('#')) color = '#' + color;
+
+                    // Normalize to 7-character HEX
+                    if (color.length === 4) {
+                        color = '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
+                    }
+
+                    const $input = $(`#ws-custom-color-${targetStep}`);
+                    if ($input.length > 0) {
+                        $input.val(color).trigger('input').trigger('change');
+
+                        // Ensure internal model is an array of 3
+                        if (!self.data.palette.base || self.data.palette.base.length < 3) {
+                            self.data.palette.base = [$('#ws-custom-color-1').val(), $('#ws-custom-color-2').val(), $('#ws-custom-color-3').val()];
+                        }
+                        self.data.palette.base[targetStep - 1] = color;
+                        self.data.palette.variation = [...self.data.palette.base];
+
+                        // Visual feedback: pulse the field
+                        $input.closest('.ws-color-picker-wrapper').addClass('ws-pulse-highlight');
+                        setTimeout(() => {
+                            $('.ws-color-picker-wrapper').removeClass('ws-pulse-highlight');
+                        }, 1000);
+
+                        console.log(`[Wizard] Success! Updated manual input ${targetStep} to ${color}`);
+                    }
+                }
+            }).catch(err => {
+                console.error('[Wizard] AI Match Error:', err);
+                $btn.html(originalHtml).prop('disabled', false);
+            });
+        },
+
         fetchTemplates: function () {
             const self = this;
             if (this.isFetching) return;
             this.isFetching = true;
+            this.data.templateProgress = 0;
 
             const payload = {
                 site_name: self.data.siteName,
                 industry: self.data.industry,
                 style: self.data.style,
+                brief: self.data.brief,
                 palette: self.data.palette.variation,
-                model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
+                model_tier: localStorage.getItem('aipg_model_tier') || 'claude_haiku'
             };
 
             this.data.error = null;
             this.callAiStudio('suggest-templates', payload).then(res => {
-                self.templates = res.templates || [];
-                self.isFetching = false;
-                self.render();
+                if (res.job_id) {
+                    self.pollTemplatesJob(res.job_id);
+                } else if (res.templates) {
+                    self.templates = res.templates || [];
+                    self.isFetching = false;
+                    self.render();
+                } else {
+                    throw new Error("Invalid response from AI Studio");
+                }
             }).catch(err => {
                 console.error('Template Fetch Error:', err);
                 self.data.error = "The AI failed to architect your templates. This might be a temporary connection issue.";
                 self.isFetching = false;
                 self.render();
+            });
+        },
+
+        pollTemplatesJob: function (jobId) {
+            const self = this;
+
+            $.post(ajaxurl, {
+                action: 'aipg_check_studio_generation_status',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                job_id: jobId
+            }, function (res) {
+                if (res.success) {
+                    const status = res.data.status;
+                    const tokens = res.data.completion_tokens || 0;
+
+                    // Estimate percentage (templates are around 3000 tokens usually)
+                    let percent = tokens > 0 ? Math.min(99, Math.round((tokens / 3000) * 100)) : 0;
+                    if (percent > self.data.templateProgress || tokens === 0) {
+                        self.data.templateProgress = percent;
+
+                        // Direct DOM update to prevent full re-render "jump"
+                        const $statusText = $('#ws-step5-status-text');
+                        if ($statusText.length > 0) {
+                            const txt = percent > 0 ? `Architecting your options... ${percent}%` : `AI is thinking and architecting...`;
+                            $statusText.text(txt);
+                        } else {
+                            // Fallback if the element isn't in DOM yet for some reason
+                            self.render();
+                        }
+                    }
+
+                    if (status === 'COMPLETED') {
+                        const payload = JSON.parse(res.data.response);
+                        self.templates = payload.templates || [];
+                        self.isFetching = false;
+                        self.render();
+                    } else if (status === 'FAILED') {
+                        self.data.error = "Layout architecting failed. Please try again.";
+                        self.isFetching = false;
+                        self.render();
+                    } else {
+                        setTimeout(() => self.pollTemplatesJob(jobId), 3000);
+                    }
+                } else {
+                    setTimeout(() => self.pollTemplatesJob(jobId), 5000);
+                }
             });
         },
 
@@ -665,6 +992,12 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             $status.find('.ws-mini-spinner').show();
             $status.find('.ws-status-text').text('Initiating AI Generation...');
 
+            // Polling interval array to safely clear on components
+            if (window.aipgStudioPolls) {
+                window.aipgStudioPolls.forEach(clearInterval);
+            }
+            window.aipgStudioPolls = [];
+
             const payload = {
                 action: 'aipg_generate_studio_prototype',
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
@@ -683,7 +1016,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 timeout: 1500000, // 25 minutes for massive AI generation
                 success: function (res) {
                     console.log('[Wizard] Prototype Response:', res);
-                    if (res.success && res.data.status === 'COMPLETED') {
+                    // The backend returns the `job_id` object directly as res.data inside of wp_send_json_success
+                    if (res.success && res.data && res.data.job_id) {
+                        const jobId = res.data.job_id;
+                        $status.find('.ws-status-text').text('AI is thinking...');
+                        self.pollGenerationStatus(jobId, template.name, $card, template.id);
+                    } else if (res.success && res.data.status === 'COMPLETED') {
+                        // Fallback in case the hook returned it completely sync (unlikely)
                         $status.find('.ws-status-text').text('Installing Prototype...');
                         self.installPrototype(res.data.response, template.name, $card, template.id);
                     } else {
@@ -702,12 +1041,71 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     let msg = 'Connection error during prototype generation.';
                     if (textStatus === 'timeout') msg = 'The AI took too long to generate the code (Timeout). Please try again.';
 
-                    $status.find('.ws-mini-spinner').hide();
                     $status.find('.ws-status-text').text('Generation Timeout');
                     alert(msg);
                     $btn.prop('disabled', false).css('opacity', 1);
                 }
             });
+        },
+
+        pollGenerationStatus: function (jobId, templateName, $card, templateRecordId) {
+            const self = this;
+            const $status = $card.find('.ws-preview-status');
+            const $btn = $card.find('.ws-btn-preview');
+            let currentProgress = 0;
+
+            $status.find('.ws-progress-fill').css('width', currentProgress + '%');
+
+            const pollId = setInterval(() => {
+                $.post(ajaxurl, {
+                    action: 'aipg_check_studio_generation_status',
+                    nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                    job_id: jobId
+                }, function (pollRes) {
+                    if (pollRes.success && pollRes.data) {
+                        const sData = pollRes.data;
+                        if (sData.status === 'COMPLETED') {
+                            clearInterval(pollId);
+                            $status.find('.ws-progress-fill').css('width', '100%');
+                            $status.find('.ws-status-text').text('Installing the prototype...');
+                            if (sData.response) {
+                                self.installPrototype(sData.response, templateName, $card, templateRecordId);
+                            } else {
+                                alert("AI completed successfully but no payload was returned.");
+                            }
+                        } else if (sData.status === 'FAILED') {
+                            clearInterval(pollId);
+                            $status.find('.ws-mini-spinner').hide();
+                            $status.find('.ws-status-text').text('Generation Failed on Server');
+                            $btn.prop('disabled', false).css('opacity', 1);
+                        } else {
+                            const tokens = sData.completion_tokens || 0;
+                            if (tokens > 0) {
+                                // Calculate actual percentage based on ~20,000 token estimate for a full layout
+                                let pct = Math.floor((tokens / 20000) * 100);
+                                if (pct > 99) pct = 99;
+
+                                // Ensure progress never goes backward
+                                if (pct > currentProgress) {
+                                    currentProgress = pct;
+                                    $status.find('.ws-progress-fill').css('width', currentProgress + '%');
+                                    $status.find('.ws-status-text').text(`Architecting structure... ${currentProgress}%`);
+                                }
+                            } else {
+                                $status.find('.ws-status-text').text('AI is thinking...');
+                            }
+                        }
+                    } else {
+                        // Polling failure, but maybe the main request is still running. We'll wait.
+                        console.warn("[Wizard] Poll returned error:", pollRes);
+                    }
+                }).fail(function () {
+                    // Server might be busy processing, ignore single 500s during long polls.
+                    console.warn("[Wizard] Poll AJAX request failed.");
+                });
+            }, 3000);
+
+            window.aipgStudioPolls.push(pollId);
         },
 
         installPrototype: function (code, name, $card, project_id) {
@@ -889,6 +1287,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const res = await this.callAiStudio('generate-prototype', {
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
+                brief: this.data.brief,
                 palette: this.data.palette.variation,
                 model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
             });

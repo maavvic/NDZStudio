@@ -1701,6 +1701,37 @@ function aipg_ajax_generate_studio_prototype() {
     wp_send_json_success( $data );
 }
 
+add_action( 'wp_ajax_aipg_check_studio_generation_status', 'aipg_ajax_check_studio_generation_status' );
+function aipg_ajax_check_studio_generation_status() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $job_id = isset( $_POST['job_id'] ) ? sanitize_text_field( wp_unslash( $_POST['job_id'] ) ) : '';
+    if ( empty( $job_id ) ) {
+        wp_send_json_error( 'Missing job_id.' );
+    }
+
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
+    $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $job_id;
+
+    $response = wp_remote_get( $endpoint, [
+        'timeout' => 10,
+    ]);
+
+    if ( is_wp_error( $response ) ) {
+        wp_send_json_error( 'Backend Connection Failed: ' . $response->get_error_message() );
+    }
+
+    $body = wp_remote_retrieve_body( $response );
+    $data = json_decode( $body, true );
+
+    if ( ! $data ) {
+        wp_send_json_error( 'Failed to decode generation status.' );
+    }
+
+    wp_send_json_success( $data );
+}
+
 add_action( 'wp_ajax_aipg_install_prototype', 'aipg_ajax_install_prototype' );
 function aipg_ajax_install_prototype() {
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
