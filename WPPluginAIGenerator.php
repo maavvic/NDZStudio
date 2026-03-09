@@ -10,7 +10,7 @@
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
-define( 'AIPG_VERSION', '1.1.5' );
+define( 'AIPG_VERSION', '1.2.4' );
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -148,7 +148,7 @@ function aipg_enqueue_admin_assets( $hook ) {
     if ( $is_wizard ) {
         wp_enqueue_style( 'wp-studio-wizard-style', plugins_url( 'assets/css/wizard-styles.css', __FILE__ ), [], AIPG_VERSION );
         // Change handle to -v3 to force refresh
-        wp_enqueue_script( 'wp-studio-wizard-script-v3', plugins_url( 'assets/js/admin-wizard.js', __FILE__ ), [ 'jquery' ], AIPG_VERSION, true );
+        wp_enqueue_script( 'wp-studio-wizard-script-v3', plugins_url( 'assets/js/admin-wizard.js', __FILE__ ), [ 'jquery' ], uniqid(), true );
 
         // Use a new variable name aipg_wizard_data to avoid clashes with any cached aipg_vars
         wp_localize_script( 'wp-studio-wizard-script-v3', 'aipg_wizard_data', [
@@ -176,7 +176,7 @@ function aipg_enqueue_studio_editor() {
 
     // Base Editor scripts
     wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
-    wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], AIPG_VERSION, true );
+    wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], uniqid(), true );
 
     // Enqueue CSS Reset if Theme Strategy falls back to Add to Existing
     $theme_strategy = get_option( 'aipg_studio_theme_strategy', 'normalize_css' );
@@ -1661,6 +1661,7 @@ function aipg_ajax_generate_studio_prototype() {
     $template_name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : '';
     $prototype_prompt = isset( $_POST['prototype_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prototype_prompt'] ) ) : '';
     $palette = isset( $_POST['palette'] ) ? (array) $_POST['palette'] : [];
+    $model_tier = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'claude_sonnet';
 
     $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-prototype';
@@ -1672,9 +1673,10 @@ function aipg_ajax_generate_studio_prototype() {
         'body'        => wp_json_encode([
             'template_name' => $template_name,
             'prototype_prompt' => $prototype_prompt,
-            'palette' => $palette
+            'palette' => $palette,
+            'model_tier' => $model_tier
         ]),
-        'timeout'     => 120, // Increased to 120s for large AI models
+        'timeout'     => 1500, // Increased to 25 minutes (1500s) for giant Claude 3.7 JSON outputs
     ]);
 
     if ( is_wp_error( $response ) ) {
@@ -1731,10 +1733,16 @@ function aipg_ajax_install_prototype() {
         ]);
         $existing_page = !empty($existing_pages) ? $existing_pages[0] : null;
         
+        // GUARDRAIL: Strip any template-part blocks (header/footer) or pure header/footer tags 
+        // that the AI might have accidentally included in the page content.
+        // Our FSE templates already include these globally.
+        $content = preg_replace('/<!--\s*wp:template-part\s*{[^}]*"slug":"(header|footer)"[^}]*}\s*\/-->/i', '', $content);
+        $content = preg_replace('/<(header|footer)[^>]*>.*?<\/\1>/is', '', $content);
+
         $post_args = [
             'post_title'   => $title,
             'post_name'    => $slug,
-            'post_content' => $content . "\n<!-- AI Studio Build: " . current_time('mysql') . " -->",
+            'post_content' => trim($content) . "\n<!-- AI Studio Build: " . current_time('mysql') . " -->",
             'post_status'  => 'publish',
             'post_type'    => 'page',
         ];
@@ -2149,7 +2157,9 @@ function aipg_ajax_remove_studio_project() {
  * AJAX Handler for Contextual AI Editing (See-Click-Prompt)
  */
 add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+add_action( 'wp_ajax_nopriv_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
 add_action( 'wp_ajax_aipg_save_as_project', 'aipg_ajax_save_as_project' );
+add_action( 'wp_ajax_nopriv_aipg_save_as_project', 'aipg_ajax_save_as_project' );
 function aipg_ajax_studio_contextual_edit() {
     check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
 
@@ -2222,6 +2232,7 @@ function aipg_ajax_studio_contextual_edit() {
             $test_tree = parse_blocks( $t->content );
             $match = aipg_find_block_in_tree( $test_tree, $markup, $search_debug_log );
             if ( $match ) {
+                error_log("[AI Studio] Block found in template: {$t->slug} ({$t->type})");
                 $matched_block_node = $match;
                 $full_parsed_tree = $test_tree;
                 $active_template = $t;
@@ -2234,6 +2245,10 @@ function aipg_ajax_studio_contextual_edit() {
 
     if ( ! $matched_block_node ) {
         error_log('[AI Studio] Block NOT FOUND in post ID: ' . $post_id . ' or its templates.');
+        file_put_contents(__DIR__ . '/search_fail_log.json', json_encode([
+            'target' => $markup,
+            'scan_log' => $search_debug_log
+        ], JSON_PRETTY_PRINT));
         wp_send_json_error( [
             'message' => 'Could not accurately identify the block in the database for replacement.',
             'diagnostics' => [
@@ -2245,6 +2260,40 @@ function aipg_ajax_studio_contextual_edit() {
 
     $serialized_target_block = serialize_blocks([$matched_block_node]);
     error_log('[AI Studio] Found Block Grammar. Size: ' . strlen($serialized_target_block));
+
+    // Feature: Transparent Template Part Styling
+    // If the user selects a Template Part wrapper, we must unwrap it and send its *inner* content 
+    // to the AI so the AI can style the actual elements (like Row, Navigation, etc.) instead of the wrapper.
+    $is_template_part_mode = false;
+    $template_part_post = null;
+    $original_template_part_grammar = $serialized_target_block; // Keep the wrapper for the UI replacement later
+
+    if ( $matched_block_node['blockName'] === 'core/template-part' ) {
+        error_log('[AI Studio] Intercepted Template Part. Unwrapping...');
+        $attrs = $matched_block_node['attrs'] ?? [];
+        $slug = $attrs['slug'] ?? '';
+        $theme = $attrs['theme'] ?? wp_get_theme()->get_stylesheet();
+
+        if ( ! empty($slug) ) {
+            $template_parts = get_block_templates([], 'wp_template_part');
+            foreach($template_parts as $tp) {
+                if ($tp->slug === $slug && $tp->theme === $theme) {
+                    $template_part_post = $tp;
+                    break;
+                }
+            }
+
+            if ( $template_part_post && ! empty($template_part_post->content) ) {
+                $is_template_part_mode = true;
+                // Swap the target block payload with the inner contents of the template part
+                error_log("[AI Studio] Successfully extracted inner content of Template Part: {$slug}");
+                $serialized_target_block = $template_part_post->content;
+            } else {
+                error_log("[AI Studio] Failed to locate inner content for Template Part: {$slug}");
+                wp_send_json_error("Could not load the internal blocks for the {$slug} template part.");
+            }
+        }
+    }
 
     $response = wp_remote_post( $endpoint, [
         'headers'     => [
@@ -2281,66 +2330,113 @@ function aipg_ajax_studio_contextual_edit() {
         // The API returns the mutated Node Grammar in 'new_markup'
         $new_block_grammar = $data['new_markup'];
         
-        // Replace the node in the tree
-        $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
-        
-        if ( $updated_tree === $full_parsed_tree ) {
-            $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
-            error_log($err_msg);
-            file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err_msg, FILE_APPEND);
-        } else {
-            error_log('[AI Studio] SUCCESS: Tree successfully mutated.');
-            file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - SUCCESS: Tree successfully mutated.\n", FILE_APPEND);
-        }
-
-        // Re-serialize the entire page / template
-        $new_post_content = serialize_blocks( $updated_tree );
-        
         $db_diagnostics = [];
+        $rendered_markup = '';
+        $tree_mutated = false;
 
-        // Determine save location
-        if ( $active_template ) {
-            $db_diagnostics[] = "Matched Template Slug: " . $active_template->slug;
-            if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
-                error_log('[AI Studio] Creating DB override for theme template: ' . $active_template->slug);
-                $is_new_template = true;
-                $target_post_id = wp_insert_post( [
-                    'post_content' => wp_slash( $new_post_content ),
-                    'post_name'    => $active_template->slug,
-                    'post_title'   => $active_template->title,
-                    'post_type'    => $active_template->type,
+        if ( $is_template_part_mode && $template_part_post ) {
+            // --- TEMPLATE PART SAVING LOGIC ---
+            $tp_db_id = $template_part_post->wp_id;
+            
+            if ( empty( $tp_db_id ) || 'theme' === $template_part_post->source ) {
+                $db_diagnostics[] = "Creating new DB override for Template Part: {$template_part_post->slug}";
+                $update_res = wp_insert_post([
+                    'post_content' => wp_slash( $new_block_grammar ),
+                    'post_name'    => $template_part_post->slug,
+                    'post_title'   => $template_part_post->title,
+                    'post_type'    => 'wp_template_part',
                     'post_status'  => 'publish',
-                ] );
-                if ( is_wp_error( $target_post_id ) ) {
-                    $err = $target_post_id->get_error_message();
-                    error_log('[AI Studio] ERROR creating template: ' . $err);
-                    $db_diagnostics[] = "Insert Error: $err";
-                } else {
-                    $term_res = wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
-                    $term_msg = is_wp_error($term_res) ? $term_res->get_error_message() : json_encode($term_res);
-                    error_log('[AI Studio] Created template override ID: ' . $target_post_id . '. Term Status: ' . $term_msg);
-                    $db_diagnostics[] = "Inserted ID: $target_post_id. Terms: $term_msg";
+                ]);
+                if ( ! is_wp_error( $update_res ) ) {
+                    wp_set_object_terms( $update_res, $template_part_post->theme, 'wp_theme' );
+                    // Also need to set the area term if available
+                    if ( isset( $template_part_post->area ) ) {
+                        wp_set_object_terms( $update_res, $template_part_post->area, 'wp_template_part_area' );
+                    }
                 }
             } else {
-                $target_post_id = $active_template->wp_id;
-                $db_diagnostics[] = "Using existing active_template ID: $target_post_id";
+                $db_diagnostics[] = "Updating existing DB Template Part Post ID: {$tp_db_id}";
+                $update_res = wp_update_post([
+                    'ID'           => $tp_db_id,
+                    'post_content' => wp_slash( $new_block_grammar )
+                ]);
             }
-        } else {
-            $db_diagnostics[] = "No active_template, updating original post ID: $target_post_id";
-        }
-
-        if ( ! $is_new_template ) {
-            $update_res = wp_update_post([
-                'ID'           => $target_post_id,
-                'post_content' => wp_slash( $new_post_content )
-            ]);
+            
             if ( is_wp_error( $update_res ) ) {
                 $err = $update_res->get_error_message();
-                error_log('[AI Studio] ERROR updating post/template: ' . $err);
-                $db_diagnostics[] = "Update Error: $err";
+                error_log('[AI Studio] ERROR updating template part: ' . $err);
+                $db_diagnostics[] = "Template Part Update Error: $err";
             } else {
-                error_log('[AI Studio] Successfully updated post/template ID: ' . $update_res);
-                $db_diagnostics[] = "Updated ID: $update_res";
+                $db_diagnostics[] = "Successfully saved Template Part DB ID: $update_res";
+                $tree_mutated = true; // Flag as successful
+            }
+            
+            // By NOT restoring the $original_template_part_grammar wrapper, 
+            // we force a direct render of the new inner blocks, bypassing WP's template cache
+            // which guarantees the frontend sees the live update immediately.
+
+        } else {
+            // Replace the node in the tree
+            $new_parsed_blocks = parse_blocks( $new_block_grammar );
+            $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks );
+            
+            if ( $updated_tree === $full_parsed_tree ) {
+                $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
+                error_log($err_msg);
+                file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err_msg, FILE_APPEND);
+            } else {
+                error_log('[AI Studio] SUCCESS: Tree successfully mutated.');
+                file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - SUCCESS: Tree successfully mutated.\n", FILE_APPEND);
+                $tree_mutated = true;
+            }
+
+            // Re-serialize the entire page / template
+            $new_post_content = serialize_blocks( $updated_tree );
+            
+            // Determine save location
+            if ( $active_template ) {
+                $db_diagnostics[] = "Matched Template Slug: " . $active_template->slug;
+                if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
+                    error_log('[AI Studio] Creating DB override for theme template: ' . $active_template->slug);
+                    $is_new_template = true;
+                    $target_post_id = wp_insert_post( [
+                        'post_content' => wp_slash( $new_post_content ),
+                        'post_name'    => $active_template->slug,
+                        'post_title'   => $active_template->title,
+                        'post_type'    => $active_template->type,
+                        'post_status'  => 'publish',
+                    ] );
+                    if ( is_wp_error( $target_post_id ) ) {
+                        $err = $target_post_id->get_error_message();
+                        error_log('[AI Studio] ERROR creating template: ' . $err);
+                        $db_diagnostics[] = "Insert Error: $err";
+                    } else {
+                        $term_res = wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+                        $term_msg = is_wp_error($term_res) ? $term_res->get_error_message() : json_encode($term_res);
+                        error_log('[AI Studio] Created template override ID: ' . $target_post_id . '. Term Status: ' . $term_msg);
+                        $db_diagnostics[] = "Inserted ID: $target_post_id. Terms: $term_msg";
+                    }
+                } else {
+                    $target_post_id = $active_template->wp_id;
+                    $db_diagnostics[] = "Using existing active_template ID: $target_post_id";
+                }
+            } else {
+                $db_diagnostics[] = "No active_template, updating original post ID: $target_post_id";
+            }
+
+            if ( ! $is_new_template ) {
+                $update_res = wp_update_post([
+                    'ID'           => $target_post_id,
+                    'post_content' => wp_slash( $new_post_content )
+                ]);
+                if ( is_wp_error( $update_res ) ) {
+                    $err = $update_res->get_error_message();
+                    error_log('[AI Studio] ERROR updating post/template: ' . $err);
+                    $db_diagnostics[] = "Update Error: $err";
+                } else {
+                    error_log('[AI Studio] Successfully updated post/template ID: ' . $update_res);
+                    $db_diagnostics[] = "Updated ID: $update_res";
+                }
             }
         }
 
@@ -2356,51 +2452,19 @@ function aipg_ajax_studio_contextual_edit() {
                 $slug = $attrs['slug'] ?? '';
                 $theme = $attrs['theme'] ?? wp_get_theme()->get_stylesheet();
                 $tag = $attrs['tagName'] ?? 'div';
-                $style_data = isset($attrs['style']) ? wp_style_engine_get_styles($attrs['style']) : [];
-                $style_str = $style_data['css'] ?? '';
                 $class_str = "wp-block-template-part aipg-part-{$slug}";
+                
+                $style_data = isset($attrs['style']) ? wp_style_engine_get_styles($attrs['style']) : [];
                 if (!empty($style_data['class'])) {
                     $class_str .= ' ' . $style_data['class'];
                 }
                 
-                // Try to get the actual template part from the DB/Theme
-                // This is needed because 'do_blocks' on the raw grammar just returns empty for template parts
-                $template_part_post = null;
-                $inner_html = '';
-                if (!empty($slug)) {
-                    $template_parts = get_block_templates([], 'wp_template_part');
-                    foreach($template_parts as $tp) {
-                        if ($tp->slug === $slug && $tp->theme === $theme) {
-                            $template_part_post = $tp;
-                            break;
-                        }
-                    }
-                    
-                    if ($template_part_post && !empty($template_part_post->content)) {
-                        $inner_html = do_blocks($template_part_post->content);
-                        
-                        // If do_blocks returns just comments, strip them
-                        $clean_html = preg_replace('/<!--(.|\s)*?-->/', '', $inner_html);
-                        
-                        if (empty(trim($clean_html))) {
-                            // The blocks didn't render into actual HTML
-                            $inner_html = ''; 
-                        } else {
-                            $db_diagnostics[] = "Rendered template part from DB content: {$slug}";
-                        }
-                    }
-                }
+                // Directly render the AI's modified inner blocks
+                $inner_html = do_blocks( $data['new_markup'] );
                 
-                if (empty(trim($inner_html))) {
-                    $db_diagnostics[] = "Warning: Template part rendered empty HTML, creating synthetic wrapper.";
-                    $slug = $slug ?: 'template-part';
-                    $inner_html = "<div style=\"padding: 20px; text-align: center; opacity: 0.7;\">
-                            <em>AI Updated Template Part ({$slug}). Refresh page to see full changes.</em>
-                        </div>";
-                }
-                
-                // Construct the final HTML wrapper that reflects the block's current styling
-                $rendered_markup = "<{$tag} class=\"{$class_str}\" style=\"{$style_str}\">{$inner_html}</{$tag}>";
+                // Construct the final HTML wrapper that reflects the block's current styling without forceful inline styles
+                // WP 5.9+ FSE themes natively drop most inline 'style' for template-parts on the frontend, so injecting it here hallucinates margins.
+                $rendered_markup = "<{$tag} class=\"{$class_str}\">{$inner_html}</{$tag}>";
                 
                 // Log the final payload for debugging
                 $db_diagnostics[] = "Final Template Part HTML Length: " . strlen($rendered_markup);
@@ -2412,6 +2476,17 @@ function aipg_ajax_studio_contextual_edit() {
         if ( function_exists( 'wp_style_engine_get_stylesheet_from_context' ) ) {
             $new_styles = wp_style_engine_get_stylesheet_from_context( 'block-supports' );
         }
+        
+        // WP 6.1+ often dumps block layout CSS (like .wp-container-... flex gap/justify) directly into the
+        // global $wp_styles object instead of the style engine store context returned above.
+        // We must extract these and append them to $new_styles so the AJAX live-preview doesn't lose layout tracking.
+        global $wp_styles;
+        if ( !empty( $wp_styles ) && isset( $wp_styles->registered['wp-block-library'] ) ) {
+            $library_extra = $wp_styles->registered['wp-block-library']->extra;
+            if ( !empty( $library_extra['after'] ) && is_array( $library_extra['after'] ) ) {
+                $new_styles .= "\n/* Layout Styles */\n" . implode("\n", $library_extra['after']);
+            }
+        }
 
         // Log everything to file
         file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - DB Diags: " . json_encode($db_diagnostics) . "\n", FILE_APPEND);
@@ -2420,7 +2495,7 @@ function aipg_ajax_studio_contextual_edit() {
             'new_markup' => $rendered_markup,
             'new_styles' => $new_styles,
             'db_diagnostics' => $db_diagnostics,
-            'tree_mutated' => ($updated_tree !== $full_parsed_tree)
+            'tree_mutated' => $tree_mutated
         ]);
     } catch ( \Throwable $e ) {
         $err = '[AI Studio] FATAL ERROR during replacement: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
@@ -2428,6 +2503,132 @@ function aipg_ajax_studio_contextual_edit() {
         file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err . "\n", FILE_APPEND);
         wp_send_json_error( 'Fatal error processing replacement: ' . $e->getMessage() );
     }
+}
+
+/**
+ * AJAX Handler for INSTANT Manual Block Tweaks (Zero AI)
+ */
+add_action( 'wp_ajax_aipg_studio_manual_edit', 'aipg_ajax_studio_manual_edit' );
+add_action( 'wp_ajax_nopriv_aipg_studio_manual_edit', 'aipg_ajax_studio_manual_edit' );
+function aipg_ajax_studio_manual_edit() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $markup          = isset( $_POST['markup'] ) ? wp_unslash( $_POST['markup'] ) : ''; 
+    $post_id         = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    
+    $width           = isset( $_POST['width'] ) ? sanitize_text_field( $_POST['width'] ) : ''; // 'full', 'constrained', ''
+    $padding_top     = isset( $_POST['padding_top'] ) ? sanitize_text_field( $_POST['padding_top'] ) : '';
+    $padding_bottom  = isset( $_POST['padding_bottom'] ) ? sanitize_text_field( $_POST['padding_bottom'] ) : '';
+    $bg_color        = isset( $_POST['bg_color'] ) ? sanitize_hex_color( $_POST['bg_color'] ) : '';
+
+    if ( empty( $markup ) || ! $post_id ) {
+        wp_send_json_error( 'Incomplete data for manual refinement.' );
+    }
+
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
+    $endpoint = rtrim($api_url, '/') . '/api/ai-studio/manual-tweak';
+
+    $matched_block_node = null;
+    $target_post_id = $post_id;
+    $is_new_template = false;
+    $full_parsed_tree = [];
+    $active_template = null;
+    $search_debug_log = [];
+
+    global $post;
+    $post = get_post($post_id);
+    setup_postdata($post);
+
+    // 1. Check primary post
+    $full_parsed_tree = parse_blocks( $post->post_content );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $markup, $search_debug_log );
+
+    // 2. Scan templates if not found
+    if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
+        usort($templates, function($a, $b) use ($post) { return 0; }); // Keep simple for manual tweak
+        foreach($templates as $t) {
+            $test_tree = parse_blocks( $t->content );
+            $match = aipg_find_block_in_tree( $test_tree, $markup, $search_debug_log );
+            if ( $match ) {
+                $matched_block_node = $match;
+                $full_parsed_tree = $test_tree;
+                $active_template = $t;
+                break;
+            }
+        }
+    }
+    wp_reset_postdata();
+
+    if ( ! $matched_block_node ) {
+        wp_send_json_error( 'Could not identify the block in the database for manual tweaking.' );
+    }
+
+    $serialized_target_block = serialize_blocks([$matched_block_node]);
+
+    // Fast call to local python API to modify attributes cleanly via Regex
+    $payload = [
+        'markup'         => $serialized_target_block,
+        'width'          => $width ? $width : null,
+        'padding_top'    => $padding_top !== '' ? strval($padding_top) : null,
+        'padding_bottom' => $padding_bottom !== '' ? strval($padding_bottom) : null,
+        'bg_color'       => $bg_color ? strval($bg_color) : null,
+    ];
+    // If the user cleared the color, we detect it if they pass the literal string 'CLEAR'
+    if (isset($_POST['bg_color']) && $_POST['bg_color'] === 'CLEAR') {
+        $payload['bg_color'] = ''; 
+    }
+
+    $response = wp_remote_post( $endpoint, [
+        'headers' => [ 'Content-Type' => 'application/json' ],
+        'body'    => wp_json_encode($payload),
+        'timeout' => 15,
+    ]);
+
+    if ( is_wp_error( $response ) ) {
+        wp_send_json_error( 'Local Tweak API Error: ' . $response->get_error_message() );
+    }
+
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( ! $data || ! isset( $data['new_markup'] ) ) {
+        wp_send_json_error( 'Failed to parse manual tweak response.' );
+    }
+
+    $new_block_grammar = $data['new_markup'];
+    $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
+    $new_post_content = serialize_blocks( $updated_tree );
+
+    // Determine save location
+    if ( $active_template ) {
+        if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
+            $is_new_template = true;
+            $target_post_id = wp_insert_post( [
+                'post_content' => wp_slash( $new_post_content ),
+                'post_name'    => $active_template->slug,
+                'post_title'   => $active_template->title,
+                'post_type'    => $active_template->type,
+                'post_status'  => 'publish',
+            ] );
+            if ( !is_wp_error( $target_post_id ) ) {
+                wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+            }
+        } else {
+            $target_post_id = $active_template->wp_id;
+        }
+    }
+
+    if ( ! $is_new_template ) {
+        wp_update_post([ 'ID' => $target_post_id, 'post_content' => wp_slash( $new_post_content ) ]);
+    }
+
+    // Render it for the frontend
+    $rendered_markup = do_blocks( $new_block_grammar );
+
+    wp_send_json_success([
+        'new_markup' => $rendered_markup,
+        'new_styles' => function_exists('wp_style_engine_get_stylesheet_from_context') ? wp_style_engine_get_stylesheet_from_context( 'block-supports' ) : '',
+    ]);
 }
 
 /**
@@ -2549,81 +2750,123 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
 
     // Helper: Normalize spacing and WP typography (smart quotes, dashes)
     $clean_html = function( $html ) {
-        $html = preg_replace( '/\s+/', ' ', trim($html) );
-        $html = str_replace(
-            ['&#8217;', '&#8216;', '&#8221;', '&#8220;', '&#8211;', '&#8212;', '’', '‘', '”', '“', '–', '—'],
-            ["'", "'", '"', '"', '-', '-', "'", "'", '"', '"', '-', '-'],
-            $html
-        );
-        return $html;
+        if ( empty( $html ) ) return '';
+
+        // 1. Decode entities so &copy; matches (C)
+        $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+        
+        // 2. Map smart quotes and common entities to primitive equivalents
+        $search  = array('“', '”', '‘', '’', '—', '–', "\xc2\xa0", '&nbsp;', '·');
+        $replace = array('"', '"', "'", "'", '-', '-', ' ', ' ', '.'); // Map middle dot to dot or just leave?
+        // Actually mapping dot to dot is risky. Let's map it across both.
+        $html = str_replace($search, $replace, $html);
+
+        // 3. Normalize self-closing tags (strip / from <hr />)
+        $html = preg_replace( '/\s*\/>/', '>', $html );
+        
+        // 4. Remove non-functional whitespace
+        $html = preg_replace( '/\s+/', ' ', $html );
+        
+        // Remove spaces between tags or at tag boundaries to minimize formatting noise
+        $html = preg_replace( '/\s*(<[^>]+>)\s*/', '$1', $html );
+        
+        return trim( $html );
     };
 
     $norm_target = $clean_html( $target_html );
+    
+    // Gutenberg generates dynamic layout container classes on the fly (e.g., wp-container-5, wp-container-core-group-is-layout-1234)
+    // These NEVER match between the JS DOM and the PHP server. We must strip them from both sides to achieve an exact match.
+    $strip_volatile_parts = function( $html ) {
+        // 1. Strip volatile attributes that WP/Browser might differ on
+        $html = preg_replace('/\bdecoding=["\']?[^"\'>\s]*["\']?/i', '', $html);
+        $html = preg_replace('/\bloading=["\']?[^"\'>\s]*["\']?/i', '', $html);
+
+        // 2. Normalize and strip dynamic classes
+        $html = preg_replace_callback('/class=["\']([^"\']*)["\']/', function($matches) {
+            $classes = preg_split('/\s+/', trim($matches[1]), -1, PREG_SPLIT_NO_EMPTY);
+            $clean = [];
+            foreach($classes as $c) {
+                // Filter out volatile layout/container/aipg classes
+                if (preg_match('/^wp-container-/i', $c)) continue;
+                if (preg_match('/^is-layout-/i', $c)) continue;
+                if (preg_match('/-is-layout-/i', $c)) continue;
+                if (preg_match('/^aipg-/i', $c)) continue;
+                
+                $c = trim($c, '-'); // Clean up leftovers
+                if ($c) $clean[] = $c;
+            }
+            sort($clean);
+            return $clean ? 'class="' . implode(' ', array_unique($clean)) . '"' : '';
+        }, $html);
+
+        // 3. Final whitespace squeeze
+        return preg_replace( '/\s+/', ' ', trim($html) );
+    };
+
+    // The safest target representation is with dynamic classes stripped
+    $stable_target = $strip_volatile_parts( $norm_target );
 
     foreach ( $parsed_blocks as $block ) {
         if ( empty( $block['blockName'] ) ) continue;
 
-        $rendered = render_block( $block );
-        $norm_rendered = $clean_html( $rendered );
-
-        // Generate structural fingerprint:
-        // 1. Strip attributes
-        $fingerprint_rendered = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_rendered);
-        $fingerprint_target   = preg_replace('/<([a-z0-9]+)[^>]*>/i', '<$1>', $norm_target);
-        
-        // 2. Strip ALL closing tags to avoid Browser DOM vs PHP auto-closing discrepancies (e.g., <path> vs <path></path>)
-        $fingerprint_rendered = preg_replace('/<\/[a-z0-9]+>/i', '', $fingerprint_rendered);
-        $fingerprint_target   = preg_replace('/<\/[a-z0-9]+>/i', '', $fingerprint_target);
-
-        // 3. Strip all physical spaces for a pure structural+text sequence
-        $fingerprint_rendered = preg_replace('/\s+/', '', $fingerprint_rendered);
-        $fingerprint_target   = preg_replace('/\s+/', '', $fingerprint_target);
-        
-        $debug_log[] = [
-            'blockName' => $block['blockName'],
-            'rendered_fingerprint' => $fingerprint_rendered,
-            'target_fingerprint' => $fingerprint_target
-        ];
-
         // 1. Recurse into InnerBlocks FIRST (Bottom-up traversal)
-        // This ensures if a user clicks a title inside a group, we return the title, not the whole group.
         if ( ! empty( $block['innerBlocks'] ) ) {
             $found_inside = aipg_find_block_in_tree( $block['innerBlocks'], $target_html, $debug_log );
             if ( $found_inside ) return $found_inside;
         }
 
-        // 2. Direct match (Typography normalized)
-        if ( strpos( $norm_rendered, $norm_target ) !== false ) return $block;
+        $rendered = render_block( $block );
+        $norm_rendered = $clean_html( $rendered );
+        $stable_rendered = $strip_volatile_parts( $norm_rendered );
+
+        if ( isset( $debug_log ) ) {
+            $debug_log[] = [
+                'blockName'       => $block['blockName'],
+                'stable_rendered' => $stable_rendered,
+                'stable_target'   => $stable_target
+            ];
+        }
+
+        // 2. Direct exact match (Aggressively normalized)
+        if ( $stable_rendered === $stable_target ) return $block;
         
-        // 3. Fallback: Structural check (Extremely robust to browser DOM mutations)
-        if ( strpos( $fingerprint_rendered, $fingerprint_target ) !== false ) return $block;
+        // 3. Robust match: Ignore all inner whitespace (Handy for entity/tag boundary mismatches)
+        if ( str_replace(' ', '', $stable_rendered) === str_replace(' ', '', $stable_target) ) return $block;
+        
+        // 4. Fallback: Typography-normalized partial match
+        if ( strpos( $norm_rendered, $norm_target ) !== false ) return $block;
     }
 
     return null;
 }
 
 /**
- * A helper to reconstruct the WP block tree after the AI returns a styled node
+ * A recursive helper to replace a specific block node within the tree with new content.
  * 
- * @param array $parsed_blocks The original tree
- * @param array $original_node The old node to find
- * @param string $new_serialized_node The new serialized string to inject
- * @return array The updated tree of blocks
+ * @param array $parsed_blocks The current block tree
+ * @param array $original_node The reference to the block node to be replaced
+ * @param array $new_blocks    An array of pre-parsed blocks to inject as the replacement
+ * @return array The updated tree
  */
-function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_serialized_node ) {
-    $new_parsed = parse_blocks( $new_serialized_node );
-    $replacement = !empty($new_parsed[0]) ? $new_parsed[0] : null;
-
-    if ( ! $replacement ) return $parsed_blocks;
+function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks ) {
+    if ( empty( $new_blocks ) ) return $parsed_blocks;
 
     foreach ( $parsed_blocks as $k => $block ) {
+        // Strict identical check for the node object
         if ( $block === $original_node ) {
-            $parsed_blocks[$k] = $replacement;
+            // Replace the single element with the array of new blocks
+            // This allows the AI to split one block into multiple or return a sequence
+            array_splice( $parsed_blocks, $k, 1, $new_blocks );
             return $parsed_blocks;
         }
         
         if ( ! empty( $block['innerBlocks'] ) ) {
-            $parsed_blocks[$k]['innerBlocks'] = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_serialized_node );
+            $updated_inner = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_blocks );
+            if ( $updated_inner !== $block['innerBlocks'] ) {
+                $parsed_blocks[$k]['innerBlocks'] = $updated_inner;
+                return $parsed_blocks; // Return early once found and replaced
+            }
         }
     }
     

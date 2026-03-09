@@ -277,6 +277,21 @@
     margin: 0;
 }
 
+.ws-template-palette {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.ws-template-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
 .ws-mini-label {
     display: block;
     font-size: 11px;

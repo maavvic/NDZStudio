@@ -31,14 +31,66 @@
             this.$modal = $(`
                 <div class="aipg-modal-backdrop"></div>
                 
-                <!-- Refinement Prompt Modal -->
+                <!-- AI Editor Sidebar -->
                 <div class="aipg-editor-modal" id="aipg-refine-modal">
-                    <h3>Refine this section</h3>
-                    <p style="font-size: 13px; color: #666;">Provide a prompt to AI to modify this specific block.</p>
-                    <textarea id="aipg-prompt-input" placeholder="e.g., 'Make this heading more professional', 'Add a button below the text', 'Change this background'"></textarea>
-                    <div style="text-align: right;">
-                        <button class="ws-btn-secondary" id="aipg-cancel-edit">Cancel</button>
-                        <button class="ws-btn-primary" id="aipg-submit-edit">Update Block</button>
+                    <div class="aipg-sidebar-header">
+                        <h3>Edit Block</h3>
+                        <button class="ws-btn-secondary" id="aipg-close-sidebar-btn" style="padding: 4px 8px; margin: 0; background: transparent; color: #888;">✕</button>
+                    </div>
+
+                    <div class="aipg-sidebar-tabs">
+                        <button class="aipg-tab-btn active" data-tab="ai-prompt">AI Magic</button>
+                        <button class="aipg-tab-btn" data-tab="manual-tweaks">Manual Tweaks</button>
+                    </div>
+
+                    <!-- AI Tab -->
+                    <div class="aipg-tab-content active" id="tab-ai-prompt">
+                        <p style="font-size: 12px; color: #888; margin-top: 0;">Provide a prompt to AI to modify this block structure or styling.</p>
+                        <textarea id="aipg-prompt-input" placeholder="e.g., 'Make this heading more professional', 'Change this background'"></textarea>
+                        
+                        <div class="aipg-control-group" style="margin-top: 15px;">
+                            <button class="ws-btn-primary" id="aipg-submit-edit" style="width: 100%;">Refine with AI</button>
+                        </div>
+                    </div>
+
+                    <!-- Manual Tweaks Tab -->
+                    <div class="aipg-tab-content" id="tab-manual-tweaks">
+                        <div class="aipg-control-group">
+                            <label class="aipg-control-label">Width Constraints</label>
+                            <select id="aipg-manual-width">
+                                <option value="constrained">Content Width (Constrained)</option>
+                                <option value="full">Full Width (Align: Full)</option>
+                            </select>
+                        </div>
+
+                        <div class="aipg-control-group">
+                            <label class="aipg-control-label">Padding Top (REM)</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="range" id="aipg-manual-pt-range" min="0" max="20" step="0.5" value="0">
+                                <span id="aipg-manual-pt-val" style="font-size:12px;color:#fff;width:30px;">0</span>
+                            </div>
+                        </div>
+
+                        <div class="aipg-control-group">
+                            <label class="aipg-control-label">Padding Bottom (REM)</label>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="range" id="aipg-manual-pb-range" min="0" max="20" step="0.5" value="0">
+                                <span id="aipg-manual-pb-val" style="font-size:12px;color:#fff;width:30px;">0</span>
+                            </div>
+                        </div>
+
+                        <div class="aipg-control-group">
+                            <label class="aipg-control-label">Background Color</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="color" id="aipg-manual-bg-color" value="#000000" style="width: 40px; padding: 0; cursor: pointer;">
+                                <button class="ws-btn-secondary" id="aipg-clear-bg-color" style="flex: 1; margin: 0; font-size: 12px; padding: 4px;">Clear Color</button>
+                            </div>
+                        </div>
+
+                        <div class="aipg-control-group" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 11px; color: #888;">Auto-saves on change</span>
+                            <span id="aipg-manual-save-status" style="font-size: 12px; font-weight: bold; color: #aaa;"></span>
+                        </div>
                     </div>
                 </div>
 
@@ -93,7 +145,7 @@
                 if (!self.aiEnabled || self.isEditing) return;
                 const $el = $(this);
 
-                const isGlobalWrapper = $el.is('body, main, header, footer, nav, .wp-site-blocks, .is-root-container, .wp-block-post-content');
+                const isGlobalWrapper = $el.is('body, nav, .wp-site-blocks, .is-root-container, .wp-block-post-content');
                 if (isGlobalWrapper) {
                     // Ignore hover for structural high-level wrappers
                     self.$overlay.hide();
@@ -234,10 +286,62 @@
                 }
             });
 
+            // Sidebar Close Button
+            $('#aipg-close-sidebar-btn').on('click', () => self.closeModal());
+
+            // Tab Switching functionality
+            $('.aipg-sidebar-tabs .aipg-tab-btn').on('click', function () {
+                $('.aipg-sidebar-tabs .aipg-tab-btn').removeClass('active');
+                $(this).addClass('active');
+
+                $('.aipg-tab-content').removeClass('active');
+                $('#tab-' + $(this).data('tab')).addClass('active');
+            });
+
             // Modal Actions
             $('#aipg-cancel-edit').on('click', () => self.closeModal());
             $('#aipg-submit-edit').on('click', () => self.submitToAi());
             $('#aipg-close-error-modal').on('click', () => self.closeErrorModal());
+
+            // Manual Tweak Live Preview (Instant DOM Update)
+            $('#aipg-manual-pt-range').on('input', function () {
+                const val = $(this).val();
+                $('#aipg-manual-pt-val').text(val);
+                if (self.$currentBlock) self.$currentBlock.css('padding-top', val + 'rem');
+            });
+            $('#aipg-manual-pb-range').on('input', function () {
+                const val = $(this).val();
+                $('#aipg-manual-pb-val').text(val);
+                if (self.$currentBlock) self.$currentBlock.css('padding-bottom', val + 'rem');
+            });
+            $('#aipg-manual-bg-color').on('input', function () {
+                const val = $(this).val();
+                if (self.$currentBlock) self.$currentBlock.css('background-color', val);
+            });
+            $('#aipg-manual-width').on('change', function () {
+                const val = $(this).val();
+                if (self.$currentBlock) {
+                    if (val === 'full') {
+                        self.$currentBlock.addClass('alignfull');
+                        // Force nested Gutenberg inner containers to expand
+                        self.$currentBlock.find('.wp-block-group__inner-container').css('max-width', '100%');
+                    } else {
+                        self.$currentBlock.removeClass('alignfull');
+                        self.$currentBlock.find('.wp-block-group__inner-container').css('max-width', '');
+                    }
+                }
+            });
+
+            // Manual Tweak Database Save (Triggers on release of slider or exact selection)
+            $('#aipg-manual-width, #aipg-manual-pt-range, #aipg-manual-pb-range, #aipg-manual-bg-color').on('change', function () {
+                self.saveManualTweaks(false);
+            });
+
+            $('#aipg-clear-bg-color').on('click', function () {
+                $('#aipg-manual-bg-color').val('#000000');
+                if (self.$currentBlock) self.$currentBlock.css('background-color', '');
+                self.saveManualTweaks(true); // Flag for clearing color
+            });
 
             $('#aipg-copy-error-btn').on('click', function (e) {
                 e.stopPropagation();
@@ -292,15 +396,18 @@
         openModal: function () {
             this.isEditing = true;
             $('.aipg-modal-backdrop').fadeIn(200);
-            $('#aipg-refine-modal').fadeIn(200);
+            $('#aipg-refine-modal').addClass('aipg-sidebar-open');
             $('#aipg-prompt-input').val('').focus();
-            $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
+            $('#aipg-submit-edit').text('Refine with AI').prop('disabled', false);
+
+            // Populate manual tweak inputs with current block state
+            this.syncManualInputsWithBlock();
         },
 
         closeModal: function () {
             this.isEditing = false;
             $('.aipg-modal-backdrop').fadeOut(200);
-            $('#aipg-refine-modal').fadeOut(200);
+            $('#aipg-refine-modal').removeClass('aipg-sidebar-open');
             this.$overlay.hide();
         },
 
@@ -337,6 +444,102 @@
             $('.aipg-modal-backdrop').fadeOut(200);
             $('#aipg-error-modal').fadeOut(200);
             this.$overlay.hide();
+        },
+
+        rgbToHex: function (rgb) {
+            if (!rgb || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent') return null;
+            let sep = rgb.indexOf(",") > -1 ? "," : " ";
+            rgb = rgb.substr(4).split(")")[0].split(sep);
+            let r = (+rgb[0]).toString(16), g = (+rgb[1]).toString(16), b = (+rgb[2]).toString(16);
+            if (r.length == 1) r = "0" + r;
+            if (g.length == 1) g = "0" + g;
+            if (b.length == 1) b = "0" + b;
+            return "#" + r + g + b;
+        },
+
+        syncManualInputsWithBlock: function () {
+            if (!this.$currentBlock) return;
+            const styles = this.getComputedStyles(this.$currentBlock);
+
+            // Width
+            if (this.$currentBlock.hasClass('alignfull')) {
+                $('#aipg-manual-width').val('full');
+            } else {
+                $('#aipg-manual-width').val('constrained');
+            }
+
+            // Padding px to rem approximation
+            const ptPx = parseFloat(styles.paddingTop) || 0;
+            const pbPx = parseFloat(styles.paddingBottom) || 0;
+            const baseFontSize = 16;
+
+            const ptVal = (ptPx / baseFontSize).toFixed(1);
+            const pbVal = (pbPx / baseFontSize).toFixed(1);
+
+            $('#aipg-manual-pt-range').val(ptVal);
+            $('#aipg-manual-pt-val').text(ptVal);
+
+            $('#aipg-manual-pb-range').val(pbVal);
+            $('#aipg-manual-pb-val').text(pbVal);
+
+            // Background Color
+            const hexColor = this.rgbToHex(styles.backgroundColor);
+            if (hexColor) {
+                $('#aipg-manual-bg-color').val(hexColor);
+            } else {
+                $('#aipg-manual-bg-color').val('#000000');
+            }
+        },
+
+        saveManualTweaks: function (clearColor = false, callback = null) {
+            if (!this.$currentBlock) return;
+            const $block = this.$currentBlock;
+
+            // Extract values
+            const width = $('#aipg-manual-width').val();
+            const pt = $('#aipg-manual-pt-range').val();
+            const pb = $('#aipg-manual-pb-range').val();
+            const bgColor = clearColor ? 'CLEAR' : $('#aipg-manual-bg-color').val();
+
+            // Prepare markup target (strip temp tracking classes and temp CSS)
+            const $clone = $block.clone();
+            $clone.removeClass('aipg-refining aipg-active-hover');
+            $clone.find('.aipg-refining, .aipg-active-hover').removeClass('aipg-refining aipg-active-hover');
+
+            // Revert temporary max-width hacks before serialization
+            $clone.find('.wp-block-group__inner-container').css('max-width', '');
+
+            const originalMarkup = $clone[0].outerHTML;
+
+            const payload = {
+                action: 'aipg_studio_manual_edit',
+                nonce: aipg_editor_vars.nonce,
+                markup: originalMarkup,
+                post_id: parseInt(aipg_editor_vars.post_id, 10),
+                width: width,
+                padding_top: pt,
+                padding_bottom: pb,
+                bg_color: bgColor
+            };
+
+            $.ajax({
+                url: aipg_editor_vars.ajaxurl + '?action=aipg_studio_manual_edit',
+                type: 'POST',
+                data: payload,
+                success: function (res) {
+                    if (!res.success) {
+                        console.error('[AI Studio] Manual Tweak Save Failed:', res.data);
+                        alert("Error saving tweaks: " + res.data);
+                    } else {
+                        console.log('[AI Studio] Manual Tweak Saved Successfully.');
+                        if (callback) callback();
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error('[AI Studio] Server error during saving manual tweak:', error);
+                    alert("Server error connecting to backend.");
+                }
+            });
         },
 
         getComputedStyles: function ($el) {
@@ -430,132 +633,90 @@
             $block.addClass('aipg-refining');
             this.closeModal();
 
-            const payload = {
-                action: 'aipg_studio_contextual_edit',
-                nonce: aipg_editor_vars.nonce,
-                prompt: prompt,
-                markup: originalMarkup,
-                computed_styles: JSON.stringify(computedStyles),
-                parent_markup: parentMarkup,
-                post_id: aipg_editor_vars.post_id,
-                model_tier: this.modelTier
-            };
+            try {
+                const payload = {
+                    action: 'aipg_studio_contextual_edit',
+                    nonce: aipg_editor_vars.nonce,
+                    prompt: prompt,
+                    markup: originalMarkup,
+                    computed_styles: JSON.stringify(computedStyles),
+                    parent_markup: parentMarkup,
+                    post_id: aipg_editor_vars.post_id,
+                    model_tier: this.modelTier
+                };
 
-            $.ajax({
-                url: aipg_editor_vars.ajaxurl,
-                type: 'POST',
-                data: payload,
-                timeout: 120000, // 2 minutes for slow Pro models
-                success: function (response) {
-                    $block.removeClass('aipg-refining');
+                console.log('[AI Studio] Sending Refinement Request:', {
+                    action: payload.action,
+                    prompt: payload.prompt,
+                    markupLength: payload.markup.length,
+                    parentMarkupLength: payload.parent_markup.length
+                });
 
-                    if (response.success) {
-                        const newMarkup = response.data.new_markup;
-                        const newStyles = response.data.new_styles;
+                $.ajax({
+                    url: aipg_editor_vars.ajaxurl + '?action=aipg_studio_contextual_edit',
+                    type: 'POST',
+                    data: payload,
+                    timeout: 120000, // 2 minutes for slow Pro models
+                    success: function (response) {
+                        $block.removeClass('aipg-refining');
 
-                        if (newStyles) {
-                            // Inject dynamic block-support styles (Flex/Grid)
-                            const styleId = 'aipg-dynamic-block-styles';
-                            let $style = $('#' + styleId);
-                            if (!$style.length) {
-                                $style = $('<style id="' + styleId + '"></style>').appendTo('head');
+                        if (response.success) {
+                            const newMarkup = response.data.new_markup;
+                            const newStyles = response.data.new_styles;
+
+                            if (newStyles) {
+                                // Inject dynamic block-support styles (Flex/Grid)
+                                const styleId = 'aipg-dynamic-block-styles';
+                                let $style = $('#' + styleId);
+                                if (!$style.length) {
+                                    $style = $('<style id="' + styleId + '"></style>').appendTo('head');
+                                }
+                                // Append new styles so side-by-side (flex) classes work live
+                                $style.html(newStyles);
                             }
-                            // Append new styles so side-by-side (flex) classes work live
-                            $style.html(newStyles);
-                        }
 
-                        let $newElement = $(newMarkup);
-                        $newElement.addClass('aipg-fade-in');
+                            let $newElement = $(newMarkup);
+                            $newElement.addClass('aipg-fade-in');
 
-                        if (isDived) {
-                            // Update the inner content of the specific content area (preserves title/wrappers)
-                            $targetContainer.html($newElement);
-                        } else {
-                            // Standard block replacement
-                            // Fallback for Dynamic Blocks like Template Parts that render as pure HTML
-                            // and might lose their jQuery bindings or structural wrapper
-                            if ($block.is('footer, header, main, .wp-block-template-part')) {
-                                // For structural tags, destroying the tag with .replaceWith() often strips 
-                                // critical FSE theme classes (like alignfull, is-layout-constrained) making it vanish.
-                                // Instead, we will merge the new styles and replace only the inner HTML.
-
-                                let $actualReplacement = $newElement;
-
-                                if (!$newElement.is($block.prop('tagName'))) {
-                                    let $innerTag = $('<div>').append($newElement).find($block.prop('tagName')).first();
-                                    if ($innerTag.length > 0) {
-                                        $actualReplacement = $innerTag;
-                                    }
-                                }
-
-
-                                if ($actualReplacement.is($block.prop('tagName'))) {
-                                    // It matches! Preserve the original $block node.
-                                    // 1. Update Inner HTML
-                                    $block.html($actualReplacement.html());
-
-                                    // 2. Apply new AI styles
-                                    const newStyle = $actualReplacement.attr('style');
-                                    if (newStyle) {
-                                        $block.attr('style', newStyle);
-                                    }
-
-                                    // 3. Add any new generated classes without destroying original ones
-                                    const newClass = $actualReplacement.attr('class');
-                                    if (newClass) {
-                                        $block.addClass(newClass);
-                                    }
-                                } else {
-                                    // Absolute fallback - ensure we don't nest a full wrapper inside
-                                    // by taking the innerHTML if the wrapper has children
-                                    if ($newElement.children().length > 0) {
-                                        $block.html($newElement.html());
-                                    } else {
-                                        $block.html($newElement); // fallback if it's just raw content
-                                    }
-
-                                    // Still apply the new styles/classes to the preserved structural block
-                                    const newStyle = $newElement.attr('style');
-                                    if (newStyle) $block.attr('style', newStyle);
-
-                                    const newClass = $newElement.attr('class');
-                                    if (newClass) $block.addClass(newClass);
-                                }
-
-                                $block.addClass('aipg-fade-in');
-
-                                // Re-bind overlay clicking events to the new element
-                                if (typeof window.aipgBindOverlayEvents === 'function') {
-                                    window.aipgBindOverlayEvents();
-                                }
+                            if (isDived) {
+                                // Update the inner content of the specific content area (preserves title/wrappers)
+                                $targetContainer.html($newElement);
                             } else {
+                                // Standard block replacement
+                                // We use .replaceWith() for everything because it's the most reliable way
+                                // to avoid nesting the new element inside the old one.
                                 $block.replaceWith($newElement);
                             }
-                        }
-                        $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
-                    } else {
-                        const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
-                        const diagData = (response.data && response.data.diagnostics) ? response.data.diagnostics : null;
+                            $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
+                        } else {
+                            const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
+                            const diagData = (response.data && response.data.diagnostics) ? response.data.diagnostics : null;
 
-                        if (diagData) {
-                            console.error('[AI Studio] Refinement Diagnostics:', diagData);
-                        }
+                            if (diagData) {
+                                console.error('[AI Studio] Refinement Diagnostics:', diagData);
+                            }
 
-                        self.showErrorModal(errorMsg, diagData);
+                            self.showErrorModal(errorMsg, diagData);
+                            $btn.text('Try Again').prop('disabled', false);
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        $block.removeClass('aipg-refining');
+                        let errMsg = 'Server error while refining block.';
+                        if (status === 'timeout') {
+                            errMsg = 'The AI took too long to respond (timeout). Please try a simpler request.';
+                        }
+                        self.showErrorModal(errMsg, { status: status, error: error, details: xhr.responseText });
+                        console.error('[AI Studio] Request Error:', status, error, xhr);
                         $btn.text('Try Again').prop('disabled', false);
                     }
-                },
-                error: function (xhr, status, error) {
-                    $block.removeClass('aipg-refining');
-                    let errMsg = 'Server error while refining block.';
-                    if (status === 'timeout') {
-                        errMsg = 'The AI took too long to respond (timeout). Please try a simpler request.';
-                    }
-                    self.showErrorModal(errMsg, { status: status, error: error, details: xhr.responseText });
-                    console.error('[AI Studio] Request Error:', status, error, xhr);
-                    $btn.text('Try Again').prop('disabled', false);
-                }
-            });
+                });
+            } catch (err) {
+                console.error('[AI Studio] Critical Payload Error:', err);
+                $block.removeClass('aipg-refining');
+                $('#aipg-submit-edit').text('Update Block').prop('disabled', false);
+                alert('JS Error while preparing payload: ' + err.message);
+            }
         },
 
         saveProject: function () {

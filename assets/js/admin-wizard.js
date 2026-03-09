@@ -221,6 +221,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                                 <div class="ws-template-card ${WPStudioWizard.data.template && WPStudioWizard.data.template.name === t.name ? 'active' : ''}" data-idx="${idx}">
                                     <div class="ws-template-header">
                                         <h3 class="ws-template-name">${t.name}</h3>
+                                        <div class="ws-template-palette">
+                                            ${WPStudioWizard.data.palette.variation.map(c => `<div class="ws-template-swatch" style="background:${c}" title="${c}"></div>`).join('')}
+                                        </div>
                                         <p class="ws-template-desc">${t.description}</p>
                                     </div>
                                     <div class="ws-template-pages">
@@ -502,33 +505,40 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 palette: self.data.palette.variation
             };
 
-            $.post(ajaxurl, payload, function (res) {
-                if (res.success && res.data.status === 'COMPLETED') {
-                    $('#ws-finish-status').text('Installing your custom WordPress environment...');
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: payload,
+                timeout: 1500000, // 25 minutes timeout
+                success: function (res) {
+                    if (res.success && res.data.status === 'COMPLETED') {
+                        $('#ws-finish-status').text('Installing your custom WordPress environment...');
 
-                    $.post(ajaxurl, {
-                        action: 'aipg_install_prototype',
-                        nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
-                        code: res.data.response,
-                        template_name: template.name,
-                        theme_strategy: self.data.themeStrategy
-                    }, function (installRes) {
-                        if (installRes.success) {
-                            self.showSuccess(installRes.data.preview_url);
-                        } else {
-                            self.showError('Installation failed: ' + installRes.data);
-                        }
-                    });
-                } else {
-                    const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
-                    self.showError('Generation failed: ' + errorMsg + ' Please try again in 30 seconds.');
+                        $.post(ajaxurl, {
+                            action: 'aipg_install_prototype',
+                            nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                            code: res.data.response,
+                            template_name: template.name,
+                            theme_strategy: self.data.themeStrategy
+                        }, function (installRes) {
+                            if (installRes.success) {
+                                self.showSuccess(installRes.data.preview_url);
+                            } else {
+                                self.showError('Installation failed: ' + installRes.data);
+                            }
+                        });
+                    } else {
+                        const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
+                        self.showError('Generation failed: ' + errorMsg + ' Please try again in 30 seconds.', true);
+                    }
+                },
+                error: function (jqXHR, textStatus) {
+                    const status = jqXHR.status;
+                    let msg = 'Connection error during final generation.';
+                    if (status === 0) msg += ' (Check if your backend is running at http://localhost:8000)';
+                    if (status === 504 || textStatus === 'timeout') msg += ' (Gateway Timeout - The AI took too long)';
+                    self.showError(msg, true);
                 }
-            }).fail(function (jqXHR) {
-                const status = jqXHR.status;
-                let msg = 'Connection error during final generation.';
-                if (status === 0) msg += ' (Check if your backend is running at http://localhost:8000)';
-                if (status === 504) msg += ' (Gateway Timeout - The AI took too long)';
-                self.showError(msg);
             });
         },
 
@@ -557,13 +567,18 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             $('#ws-progress-bar').css('width', '100%');
         },
 
-        showError: function (msg) {
+        showError: function (msg, allowRetry = false) {
+            let retryBtn = allowRetry ? `<button class="ws-btn ws-btn-secondary" onclick="WPStudioWizard.showStep(5)">Try Generation Again</button>` : '';
+
             $('#wp-studio-wizard-root').html(`
                 <div class="ws-wizard-step" style="text-align:center; align-items:center;">
                     <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
                     <h2 class="ws-title">Architecture Interrupted</h2>
                     <p class="ws-subtitle">${msg}</p>
-                    <button class="ws-btn ws-btn-primary" onclick="location.reload()">Restart Wizard</button>
+                    <div style="display:flex; flex-direction:column; align-items:center; gap: 10px; margin-top:20px;">
+                        <button class="ws-btn ws-btn-primary" onclick="location.reload()">Restart Wizard</button>
+                        ${retryBtn}
+                    </div>
                 </div>
             `);
         },
@@ -646,7 +661,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const $btn = $card.find('.ws-btn-preview');
 
             $btn.prop('disabled', true).css('opacity', 0.5);
-            $status.show().find('.ws-status-text').text('Initiating AI Generation...');
+            $status.show();
+            $status.find('.ws-mini-spinner').show();
+            $status.find('.ws-status-text').text('Initiating AI Generation...');
 
             const payload = {
                 action: 'aipg_generate_studio_prototype',
@@ -659,24 +676,37 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
             console.log('[Wizard] Generating Prototype for:', template.name, 'Payload:', payload);
 
-            $.post(ajaxurl, payload, function (res) {
-                console.log('[Wizard] Prototype Response:', res);
-                if (res.success && res.data.status === 'COMPLETED') {
-                    $status.find('.ws-status-text').text('Installing Prototype...');
-                    self.installPrototype(res.data.response, template.name, $card, template.id);
-                } else {
-                    const data = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
-                    let errorMsg = typeof data === 'object' ? (data.msg || JSON.stringify(data)) : data;
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: payload,
+                timeout: 1500000, // 25 minutes for massive AI generation
+                success: function (res) {
+                    console.log('[Wizard] Prototype Response:', res);
+                    if (res.success && res.data.status === 'COMPLETED') {
+                        $status.find('.ws-status-text').text('Installing Prototype...');
+                        self.installPrototype(res.data.response, template.name, $card, template.id);
+                    } else {
+                        const data = (res && res.data) ? res.data : 'The AI engine might be busy or returning malformed data.';
+                        let errorMsg = typeof data === 'object' ? (data.msg || JSON.stringify(data)) : data;
 
-                    $status.find('.ws-status-text').text('Generation Error');
-                    console.error('[Wizard] Prototype Generation Error:', data);
-                    alert('Generation Failed: ' + errorMsg);
+                        $status.find('.ws-mini-spinner').hide();
+                        $status.find('.ws-status-text').text('Generation Error');
+                        console.error('[Wizard] Prototype Generation Error:', data);
+                        alert('Generation Failed: ' + errorMsg);
+                        $btn.prop('disabled', false).css('opacity', 1);
+                    }
+                },
+                error: function (jqXHR, textStatus) {
+                    console.error('[Wizard] Prototype Request Failed:', jqXHR, textStatus);
+                    let msg = 'Connection error during prototype generation.';
+                    if (textStatus === 'timeout') msg = 'The AI took too long to generate the code (Timeout). Please try again.';
+
+                    $status.find('.ws-mini-spinner').hide();
+                    $status.find('.ws-status-text').text('Generation Timeout');
+                    alert(msg);
                     $btn.prop('disabled', false).css('opacity', 1);
                 }
-            }).fail(function (jqXHR) {
-                console.error('[Wizard] Prototype Request Failed:', jqXHR);
-                alert('Connection error during prototype generation.');
-                $btn.prop('disabled', false).css('opacity', 1);
             });
         },
 
