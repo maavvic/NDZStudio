@@ -41,7 +41,17 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                                 <p style="color: var(--ws-text-secondary); font-size: 14px; line-height: 1.5; margin: 0;">Keep your current theme. We will try our best to normalize margins and padding on AI pages to prevent conflicts.</p>
                             </div>
                         </div>
+
+                        <div id="ws-recent-projects-area" style="margin-top: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 30px;">
+                            <h3 class="ws-mini-title" style="margin-bottom:20px; font-size: 16px; font-weight: 600;">Resume Your Projects</h3>
+                            <div id="ws-recent-projects-list">
+                                <div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Looking for saved designs...</div>
+                            </div>
+                        </div>
                     `;
+                },
+                onEnter: function () {
+                    WPStudioWizard.fetchRecentProjects();
                 },
                 validate: function () {
                     if (!WPStudioWizard.data.themeStrategy) return 'Please select how you want to build your site.';
@@ -57,17 +67,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             <label class="ws-label">Website Name</label>
                             <input type="text" id="ws-site-name" class="ws-input" placeholder="e.g. My Awesome Bakery" value="${WPStudioWizard.data.siteName}">
                         </div>
-
-                        <div id="ws-recent-projects-area" style="margin-top: 40px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 30px;">
-                            <h3 class="ws-mini-title" style="margin-bottom:20px; font-size: 16px; font-weight: 600;">Resume Your Projects</h3>
-                            <div id="ws-recent-projects-list">
-                                <div class="ws-ai-loading"><div class="ws-mini-spinner"></div> Looking for saved designs...</div>
-                            </div>
-                        </div>
                     `;
-                },
-                onEnter: function () {
-                    WPStudioWizard.fetchRecentProjects();
                 },
                 validate: function () {
                     const val = $('#ws-site-name').val().trim();

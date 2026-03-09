@@ -141,16 +141,21 @@
             const self = this;
 
             // Global hover tracking: Focus on all blocks including large containers and headers
-            $(document).on('mouseenter', '[class*="wp-block-"], header, footer, main, nav', function (e) {
+            const targetSelectors = '[class*="wp-block-"], header, footer, main, nav, section, article, div, p, span, h1, h2, h3, h4, h5, h6, a, img, button, ul, ol, li, blockquote, figure, figcaption';
+
+            $(document).on('mouseenter', targetSelectors, function (e) {
                 if (!self.aiEnabled || self.isEditing) return;
                 const $el = $(this);
 
-                const isGlobalWrapper = $el.is('body, nav, .wp-site-blocks, .is-root-container, .wp-block-post-content');
+                const isGlobalWrapper = $el.is('body, html, .wp-site-blocks, .is-root-container, #wp-studio-wizard-root');
                 if (isGlobalWrapper) {
                     // Ignore hover for structural high-level wrappers
                     self.$overlay.hide();
                     return;
                 }
+
+                // Protect against hovering over our own modals/UI
+                if ($el.closest('.aipg-editor-modal, .aipg-mode-toggle, .aipg-block-overlay').length > 0) return;
 
                 // Stop propagation so we pick the innermost block when hovering specifically,
                 // BUT we allow the user to reach outer blocks if they hover on their edges.
@@ -191,7 +196,7 @@
                 }
             });
 
-            $(document).on('mouseleave', '[class*="wp-block-"], header, footer, main, nav', function () {
+            $(document).on('mouseleave', targetSelectors, function () {
                 if (!self.aiEnabled || self.isEditing) return;
                 self.$overlay.hide().removeClass('aipg-active');
 
@@ -578,11 +583,14 @@
             const containsContentArea = $block.find('.entry-content, .wp-block-post-content').length > 0;
             const isContentArea = $block.hasClass('entry-content') || $block.hasClass('wp-block-post-content');
             const isHighLevelWrapper = $block.prop("tagName") === 'MAIN' || $block.prop("tagName") === 'BODY' || $block.hasClass('wp-site-blocks');
-
             const isThemeContainer = isContentArea || containsContentArea || isHighLevelWrapper;
-            const isGutenbergBlock = $block.attr('class') && $block.attr('class').includes('wp-block-') && !$block.hasClass('wp-block-post-title');
 
-            if (isThemeContainer || !isGutenbergBlock) {
+            // Allow native HTML elements to pass through directly without surgical unwrapping
+            const isNativeHTML = $block.is('p, span, h1, h2, h3, h4, h5, h6, a, img, button, ul, ol, li, blockquote, figure, figcaption');
+            const isGutenbergBlock = ($block.attr('class') && $block.attr('class').includes('wp-block-') && !$block.hasClass('wp-block-post-title')) || isNativeHTML;
+
+            // Only run surgical extraction if it's explicitly a theme container, OR a generic structural div wrapping Gutenberg blocks
+            if (isThemeContainer || (!isGutenbergBlock && $block.is('div, section, article, nav'))) {
                 // Find all blocks INSIDE the content area (skip theme-level wrappers)
                 let $contentArea = $block;
                 if (containsContentArea && !isContentArea) {
@@ -678,13 +686,24 @@
                             let $newElement = $(newMarkup);
                             $newElement.addClass('aipg-fade-in');
 
-                            if (isDived) {
+                            if (response.data.is_template_part) {
+                                // The backend updated an entire template part (like Header/Footer).
+                                // Replace the closest template part container rather than the specific block hovered.
+                                let $tpContainer = $block.closest('header, footer, [class*="wp-block-template-part"]');
+                                if ($tpContainer.length) {
+                                    console.log('[AI Studio] Replacer: Replacing Template Part Container', { old: $tpContainer[0].outerHTML, new: $newElement[0].outerHTML });
+                                    $tpContainer.replaceWith($newElement);
+                                } else {
+                                    console.log('[AI Studio] Replacer: Replacing Template Part Block', { old: $block[0].outerHTML, new: $newElement[0].outerHTML });
+                                    $block.replaceWith($newElement);
+                                }
+                            } else if (isDived) {
                                 // Update the inner content of the specific content area (preserves title/wrappers)
+                                console.log('[AI Studio] Replacer: Diving content via .html()', { container: $targetContainer[0].outerHTML, innerHTML: newMarkup });
                                 $targetContainer.html($newElement);
                             } else {
                                 // Standard block replacement
-                                // We use .replaceWith() for everything because it's the most reliable way
-                                // to avoid nesting the new element inside the old one.
+                                console.log('[AI Studio] Replacer: Standard replaceWith', { old: $block[0].outerHTML, new: $newElement.prop('outerHTML') || newMarkup });
                                 $block.replaceWith($newElement);
                             }
                             $('#aipg-submit-edit').text('Update Block').prop('disabled', false);

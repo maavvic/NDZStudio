@@ -2378,7 +2378,7 @@ function aipg_ajax_studio_contextual_edit() {
         } else {
             // Replace the node in the tree
             $new_parsed_blocks = parse_blocks( $new_block_grammar );
-            $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks );
+            $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks, $data['new_markup'] );
             
             if ( $updated_tree === $full_parsed_tree ) {
                 $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
@@ -2442,6 +2442,30 @@ function aipg_ajax_studio_contextual_edit() {
 
         // Render just the newly designed block to return to the frontend
         $rendered_markup = do_blocks( $new_block_grammar );
+
+        // If this was a partial match (e.g. modifying <p> inside a wp:paragraph), 
+        // $new_block_grammar is just raw HTML and lacks the Gutenberg wrapper.
+        // We must return the fully reconstructed parent block from the mutated tree 
+        // so the frontend `replaceWith` maintains the wrapper structure.
+        if ( isset($matched_block_node['_aipg_match_type']) && $matched_block_node['_aipg_match_type'] === 'partial' ) {
+            // Re-find the mutated block in the updated tree to render it
+            // (We could do this more elegantly, but re-traversing the updated tree ensures 
+            // we get the final serialized shape with the new innerHTML)
+            // Actually, we mutated $full_parsed_tree by reference in the earlier logic, 
+            // but tracking the exact node is tricky.
+            // A simpler approach: we just serialized the entire updated tree to $new_post_content.
+            // Let's use `aipg_find_block_in_tree` to find the exact replacement block in the newly serialized tree!
+            $new_parsed_tree = parse_blocks( $new_post_content );
+            // Use the replacement string as the target to find it
+            $temp_log = [];
+            $found_new_node = aipg_find_block_in_tree( $new_parsed_tree, $data['new_markup'], $temp_log );
+            if ( $found_new_node ) {
+                $rendered_markup = do_blocks( serialize_blocks([$found_new_node]) );
+                $db_diagnostics[] = "Partial Match Re-wrap: Retrieved updated parent block wrapper for frontend.";
+            } else {
+                $db_diagnostics[] = "Partial Match Re-wrap Failed: Could not locate new string in tree.";
+            }
+        }
         
         // Template parts need custom handling in AJAX contexts because do_blocks 
         // often returns generic wrappers rather than their internal HTML tree.
@@ -2495,7 +2519,8 @@ function aipg_ajax_studio_contextual_edit() {
             'new_markup' => $rendered_markup,
             'new_styles' => $new_styles,
             'db_diagnostics' => $db_diagnostics,
-            'tree_mutated' => $tree_mutated
+            'tree_mutated' => $tree_mutated,
+            'is_template_part' => isset($is_template_part_mode) ? $is_template_part_mode : false
         ]);
     } catch ( \Throwable $e ) {
         $err = '[AI Studio] FATAL ERROR during replacement: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
@@ -2829,13 +2854,25 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
         }
 
         // 2. Direct exact match (Aggressively normalized)
-        if ( $stable_rendered === $stable_target ) return $block;
+        if ( $stable_rendered === $stable_target ) {
+            $block['_aipg_match_type'] = 'exact';
+            return $block;
+        }
         
         // 3. Robust match: Ignore all inner whitespace (Handy for entity/tag boundary mismatches)
-        if ( str_replace(' ', '', $stable_rendered) === str_replace(' ', '', $stable_target) ) return $block;
+        if ( str_replace(' ', '', $stable_rendered) === str_replace(' ', '', $stable_target) ) {
+            $block['_aipg_match_type'] = 'exact';
+            return $block;
+        }
         
         // 4. Fallback: Typography-normalized partial match
-        if ( strpos( $norm_rendered, $norm_target ) !== false ) return $block;
+        if ( strpos( $norm_rendered, $norm_target ) !== false ) {
+            // It's a partial match inside this block (e.g. a <p> inside a wp:paragraph wrapper)
+            // Storing the target HTML so we know what to replace during tree mutation
+            $block['_aipg_match_type'] = 'partial';
+            $block['_aipg_partial_target'] = $target_html; 
+            return $block;
+        }
     }
 
     return null;
@@ -2847,24 +2884,60 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
  * @param array $parsed_blocks The current block tree
  * @param array $original_node The reference to the block node to be replaced
  * @param array $new_blocks    An array of pre-parsed blocks to inject as the replacement
+ * @param string $new_raw_html The raw HTML returned by the AI (used for partial replacements)
  * @return array The updated tree
  */
-function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks ) {
-    if ( empty( $new_blocks ) ) return $parsed_blocks;
+function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks, $new_raw_html = '' ) {
+    if ( empty( $new_blocks ) && empty( $new_raw_html ) ) return $parsed_blocks;
 
-    foreach ( $parsed_blocks as $k => $block ) {
+    foreach ( $parsed_blocks as $k => &$block ) {
         // Strict identical check for the node object
         if ( $block === $original_node ) {
-            // Replace the single element with the array of new blocks
-            // This allows the AI to split one block into multiple or return a sequence
-            array_splice( $parsed_blocks, $k, 1, $new_blocks );
-            return $parsed_blocks;
+            
+            $match_type = isset($block['_aipg_match_type']) ? $block['_aipg_match_type'] : 'exact';
+            
+            if ( $match_type === 'partial' && !empty($new_raw_html) && !empty($block['_aipg_partial_target']) ) {
+                // PARTIAL MATCH (INNER HTML ONLY)
+                // The user selected an inner text element (like <p>) that doesn't have its own WP comment block.
+                // We MUST preserve the outer block wrapper and only str_replace the innerHTML.
+                
+                $target = trim($block['_aipg_partial_target']);
+                $replacement = trim($new_raw_html);
+                
+                // 1. We must unwrap the replacement if the AI accidentally wrapped it in WP comments
+                // because we are injecting INSIDE an existing WP comment block.
+                $replacement = preg_replace('/^<!--\s*wp:[^\>]+-->\s*/', '', $replacement);
+                $replacement = preg_replace('/\s*<!--\s*\/wp:[a-zA-Z0-9-]+\s*-->$/', '', $replacement);
+                
+                // 2. Perform surgical string replacement on the block's content arrays
+                if ( isset($block['innerHTML']) ) {
+                    $block['innerHTML'] = str_replace( $target, $replacement, $block['innerHTML'] );
+                }
+                if ( isset($block['innerContent']) && is_array($block['innerContent']) ) {
+                    foreach ( $block['innerContent'] as $ic_key => $ic_val ) {
+                        if ( is_string($ic_val) ) {
+                            $block['innerContent'][$ic_key] = str_replace( $target, $replacement, $ic_val );
+                        }
+                    }
+                }
+                
+                // Clean up tracking flags
+                unset( $block['_aipg_match_type'] );
+                unset( $block['_aipg_partial_target'] );
+                
+                return $parsed_blocks;
+                
+            } else {
+                // EXACT MATCH (FULL BLOCK REPLACEMENT)
+                array_splice( $parsed_blocks, $k, 1, $new_blocks );
+                return $parsed_blocks;
+            }
         }
         
         if ( ! empty( $block['innerBlocks'] ) ) {
-            $updated_inner = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_blocks );
+            $updated_inner = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_blocks, $new_raw_html );
             if ( $updated_inner !== $block['innerBlocks'] ) {
-                $parsed_blocks[$k]['innerBlocks'] = $updated_inner;
+                $block['innerBlocks'] = $updated_inner;
                 return $parsed_blocks; // Return early once found and replaced
             }
         }
