@@ -26,19 +26,33 @@
         },
 
         createUI: function () {
-            this.$overlay = $('<div class="aipg-block-overlay"></div>').appendTo('body');
-            this.$label = $('<div class="aipg-block-label">✨ <span>Edit with AI</span></div>').appendTo(this.$overlay);
-
-            // Add Omni-directional Insert Nodes
-            const dirs = ['top', 'bottom', 'left', 'right'];
-            dirs.forEach(dir => {
-                this.$overlay.append(`
-                    <div class="aipg-omni-node aipg-omni-${dir}">
-                        <button class="aipg-omni-btn aipg-omni-dup" data-dir="${dir}" title="Duplicate element here">+</button>
-                        <button class="aipg-omni-btn aipg-omni-ai" data-dir="${dir}" title="Generate new element with AI">✨</button>
+            // Initialize UI Modal & Overlay
+            this.$overlay = $(`
+                <div class="aipg-block-overlay">
+                    <div class="aipg-omni-node aipg-omni-top">
+                        <button class="aipg-omni-dup" data-dir="top" title="Duplicate Above">+</button>
+                        <button class="aipg-omni-ai" data-dir="top" title="Generate New Above">✨</button>
                     </div>
-                `);
-            });
+                    <div class="aipg-omni-node aipg-omni-bottom">
+                        <button class="aipg-omni-dup" data-dir="bottom" title="Duplicate Below">+</button>
+                        <button class="aipg-omni-ai" data-dir="bottom" title="Generate New Below">✨</button>
+                    </div>
+                    <div class="aipg-omni-node aipg-omni-left">
+                        <button class="aipg-omni-dup" data-dir="left" title="Duplicate Left">+</button>
+                        <button class="aipg-omni-ai" data-dir="left" title="Generate New Left">✨</button>
+                    </div>
+                    <div class="aipg-omni-node aipg-omni-right">
+                        <button class="aipg-omni-dup" data-dir="right" title="Duplicate Right">+</button>
+                        <button class="aipg-omni-ai" data-dir="right" title="Generate New Right">✨</button>
+                    </div>
+                    
+                    <!-- Delete Button in Top Right Corner -->
+                    <button class="aipg-omni-del" title="Delete Block" style="position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: #ef4444; border: 2px solid #111; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.5); pointer-events: auto; transition: transform 0.1s ease;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </div>
+            `).appendTo('body');
+            this.$label = $('<div class="aipg-block-label">✨ <span>Edit with AI</span></div>').appendTo(this.$overlay);
 
             this.$modal = $(`
                 <div class="aipg-modal-backdrop"></div>
@@ -264,6 +278,33 @@
                         <button class="ws-btn-primary" id="aipg-omni-prompt-submit" style="background: var(--aipg-accent); border: none; padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">Generate Element</button>
                     </div>
                 </div>
+
+                <!-- Custom Confirm Modal -->
+                <div id="aipg-custom-confirm-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; max-width: 95%; background: var(--aipg-glass-bg); backdrop-filter: blur(12px); border: 1px solid rgba(239, 68, 68, 0.5); border-radius: 12px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 10000003; color: var(--aipg-text);">
+                    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 18px; color: #ef4444;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        Confirm Action
+                    </h3>
+                    <p id="aipg-custom-confirm-message" style="font-size: 14px; color: var(--aipg-text); margin-bottom: 20px;">Are you sure you want to proceed?</p>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button class="ws-btn-secondary" id="aipg-custom-confirm-cancel" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer;">Cancel</button>
+                        <button class="ws-btn-primary" id="aipg-custom-confirm-yes" style="background: #ef4444; border: none; padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">Yes, proceed</button>
+                    </div>
+                </div>
+
+                <!-- Custom Alert Modal -->
+                <div id="aipg-custom-alert-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; max-width: 95%; background: var(--aipg-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--aipg-accent); border-radius: 12px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 10000003; color: var(--aipg-text);">
+                    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 18px; color: var(--aipg-accent);">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        Notice
+                    </h3>
+                    <p id="aipg-custom-alert-message" style="font-size: 14px; color: var(--aipg-text); margin-bottom: 20px;">This is an alert.</p>
+                    
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button class="ws-btn-primary" id="aipg-custom-alert-ok" style="background: var(--aipg-accent); border: none; padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">OK</button>
+                    </div>
+                </div>
             `).appendTo('body');
 
             // Float Toggle Mode
@@ -313,7 +354,7 @@
                 }
 
                 // Protect against hovering over our own modals/UI
-                if ($el.closest('.aipg-editor-modal, .aipg-mode-toggle, .aipg-block-overlay').length > 0) return;
+                if ($el.closest('.aipg-editor-modal, .aipg-mode-toggle, .aipg-block-overlay, #aipg-custom-confirm-modal, #aipg-custom-alert-modal, .aipg-outline-box, .aipg-modal-backdrop').length > 0) return;
 
                 // Prevent flicker: if we are already highlighting THIS exact block, do nothing.
                 if (self.$currentBlock && self.$currentBlock[0] === $el[0] && self.$overlay.is(':visible')) {
@@ -397,8 +438,8 @@
             $(document).on('mousedown', function (e) {
                 if (!self.aiEnabled || self.isEditing || !self.$overlay.is(':visible')) return;
 
-                // Ignore clicks on omni buttons
-                if ($(e.target).closest('.aipg-omni-node').length) return;
+                // Ignore clicks on omni buttons and the delete button
+                if ($(e.target).closest('.aipg-omni-node, .aipg-omni-del').length) return;
 
                 const o = self.$overlay.offset();
                 const w = self.$overlay.outerWidth();
@@ -648,7 +689,7 @@
                 } else if (type === 'logo' || type === 'image') {
                     // Fallback if media library fails to load for some reason
                     console.error('[AI Studio] WordPress Media Library not available on frontend.');
-                    alert('WordPress Media Library is not available. Please ensure you are logged in as admin.');
+                    self.showAlertModal('WordPress Media Library is not available. Please ensure you are logged in as admin.');
                 } else {
                     self.insertNewBlock(type, 'below');
                 }
@@ -678,6 +719,16 @@
                 $('#aipg-omni-prompt-modal').fadeIn(200);
                 $('#aipg-omni-prompt-input').val('').focus();
                 self.isEditing = true;
+            });
+
+            $(document).on('click', '.aipg-omni-del', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!self.$currentBlock) return;
+
+                self.showConfirmModal('Are you sure you want to permanently delete this element?', () => {
+                    self.omniDeleteElement();
+                });
             });
 
             $(document).on('click', '#aipg-omni-prompt-cancel', function () {
@@ -711,6 +762,12 @@
                 if ($('#aipg-omni-prompt-modal').is(':visible')) {
                     $('#aipg-omni-prompt-modal').fadeOut(200);
                     self.isEditing = false;
+                }
+                if ($('#aipg-custom-confirm-modal').is(':visible')) {
+                    $('#aipg-custom-confirm-modal').fadeOut(200);
+                }
+                if ($('#aipg-custom-alert-modal').is(':visible')) {
+                    $('#aipg-custom-alert-modal').fadeOut(200);
                 }
             });
         },
@@ -767,6 +824,35 @@
             $('.aipg-modal-backdrop').fadeOut(200);
             $('#aipg-refine-modal').removeClass('aipg-sidebar-open');
             this.$overlay.hide();
+        },
+
+        showConfirmModal: function (message, onConfirm) {
+            $('#aipg-custom-confirm-message').text(message);
+            $('.aipg-modal-backdrop').fadeIn(200);
+            $('#aipg-custom-confirm-modal').fadeIn(200);
+
+            // Clean up previous event listeners namespace to prevent double-firing
+            $('#aipg-custom-confirm-yes').off('click').on('click', () => {
+                $('#aipg-custom-confirm-modal').fadeOut(200);
+                $('.aipg-modal-backdrop').fadeOut(200);
+                if (onConfirm) onConfirm();
+            });
+
+            $('#aipg-custom-confirm-cancel').off('click').on('click', () => {
+                $('#aipg-custom-confirm-modal').fadeOut(200);
+                $('.aipg-modal-backdrop').fadeOut(200);
+            });
+        },
+
+        showAlertModal: function (message) {
+            $('#aipg-custom-alert-message').text(message);
+            $('.aipg-modal-backdrop').fadeIn(200);
+            $('#aipg-custom-alert-modal').fadeIn(200);
+
+            $('#aipg-custom-alert-ok').off('click').on('click', () => {
+                $('#aipg-custom-alert-modal').fadeOut(200);
+                $('.aipg-modal-backdrop').fadeOut(200);
+            });
         },
 
         showErrorModal: function (message, diagnosticsObj = null) {
@@ -1021,21 +1107,25 @@
             // Rule 1: It MUST have a class starting with wp-block-
             // Rule 2: It CANNOT be a BEM child element (containing __)
             // Rule 3: It CANNOT be a generic inline/media tag disguised as a block root.
-            while ($block.length) {
-                const hasBlockClass = $block[0].className && $block[0].className.includes('wp-block-');
-                const isBEMChild = $block[0].className && $block[0].className.includes('__');
-                const isDisallowedTag = $block.is('span, img, a, strong, em, b, i');
+            let $rootBlock = $block.closest('[class*="wp-block-"]');
+            while ($rootBlock.length) {
+                const className = $rootBlock[0].className || '';
+                const isBEMChild = className.includes('__');
+                const isDisallowedTag = $rootBlock.is('span, img, a, strong, em, b, i');
 
-                if (hasBlockClass && !isBEMChild && !isDisallowedTag) {
+                if (!isBEMChild && !isDisallowedTag) {
                     break; // Found a valid root block
                 }
 
-                const $parent = $block.parent().closest('[class*="wp-block-"]');
-                if ($parent.length && $parent[0] !== $block[0]) {
-                    $block = $parent;
+                const $parent = $rootBlock.parent().closest('[class*="wp-block-"]');
+                if ($parent.length && $parent[0] !== $rootBlock[0]) {
+                    $rootBlock = $parent;
                 } else {
                     break;
                 }
+            }
+            if ($rootBlock.length) {
+                $block = $rootBlock;
             }
 
             // Visual feedback
@@ -1110,6 +1200,87 @@
                 error: function (xhr, status, error) {
                     $block.css('border', originalBorder || '');
                     self.showErrorModal('Network error during insertion: ' + status);
+                }
+            });
+        },
+
+        omniDeleteElement: function () {
+            const self = this;
+            let $block = this.$currentBlock;
+            if (!$block) return;
+
+            // Follow the same rigid tree extraction logic to safely delete the right root level DOM node
+            let $rootBlock = $block.closest('[class*="wp-block-"]');
+            while ($rootBlock.length) {
+                const className = $rootBlock[0].className || '';
+                const isBEMChild = className.includes('__');
+                const isDisallowedTag = $rootBlock.is('span, img, a, strong, em, b, i');
+
+                if (!isBEMChild && !isDisallowedTag) {
+                    break;
+                }
+                const $parent = $rootBlock.parent().closest('[class*="wp-block-"]');
+                if ($parent.length && $parent[0] !== $rootBlock[0]) {
+                    $rootBlock = $parent;
+                } else {
+                    break;
+                }
+            }
+            if ($rootBlock.length) {
+                $block = $rootBlock;
+            }
+
+            const originalBorder = $block.css('border');
+            $block.css('border', '2px solid #ef4444').fadeTo(200, 0.5);
+
+            const $clone = $block.clone();
+            $clone.removeClass(function (index, className) {
+                return (className.match(/(^|\s)aipg-\S+/g) || []).join(' ');
+            });
+            // jQuery removeClass can leave an empty class="" attribute, which throws off string matching if the original block had one class that was just stripped.
+            if ($clone.attr('class') === '') {
+                $clone.removeAttr('class');
+            }
+            $clone.removeAttr('data-aipg-hover');
+            $clone.removeAttr('style');
+            $clone.find('*').removeAttr('style');
+            $clone.find('.aipg-omni-node, .aipg-omni-del').remove();
+
+            const targetMarkup = $clone[0].outerHTML;
+
+            const payload = {
+                action: 'aipg_studio_insert_element', // Re-using insert endpoint, parsing 'delete' action_type
+                nonce: aipg_editor_vars.nonce,
+                action_type: 'delete',
+                position: '',
+                prompt: '',
+                lookup_markup: targetMarkup,
+                post_id: parseInt(aipg_editor_vars.post_id, 10),
+            };
+
+            $.ajax({
+                url: aipg_editor_vars.ajaxurl,
+                type: 'POST',
+                data: payload,
+                success: function (response) {
+                    if (response.success) {
+                        self.$overlay.hide().removeClass('aipg-active');
+                        $block.fadeOut(300, function () { $(this).remove(); });
+                        self.$currentBlock = null;
+
+                        // Fire a small toast or visual confirmation
+                        const $toast = $('<div style="position:fixed;bottom:20px;right:20px;background:#ef4444;color:white;padding:12px 24px;border-radius:8px;z-index:999999;box-shadow:0 10px 25px rgba(0,0,0,0.5);">Block Deleted</div>').appendTo('body');
+                        setTimeout(() => $toast.fadeOut(300, function () { $(this).remove(); }), 2500);
+
+                    } else {
+                        $block.css('border', originalBorder || '').fadeTo(100, 1.0);
+                        const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
+                        self.showErrorModal('Deletion failed: ' + errorMsg);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    $block.css('border', originalBorder || '').fadeTo(100, 1.0);
+                    self.showErrorModal('Network error during deletion: ' + status);
                 }
             });
         },

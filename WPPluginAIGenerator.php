@@ -2924,6 +2924,10 @@ function aipg_ajax_studio_insert_element() {
         // Clone the PHP node exactly
         $new_blocks_array = [ $matched_block_node ];
         $new_block_grammar = serialize_blocks( $new_blocks_array );
+    } elseif ( $action_type === 'delete' ) {
+        // Empty array triggers a pure removal of the target node
+        $new_blocks_array = [];
+        $new_block_grammar = '';
     } else {
         // AI Generation Call
         $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
@@ -3007,8 +3011,12 @@ function aipg_ajax_studio_insert_element() {
         ]);
     }
 
-    // Return the rendered HTML of the new block(s) so frontend can inject it and preview
-    $rendered_markup = do_blocks( $new_block_grammar );
+    // Output logic
+    $rendered_markup = '';
+    if ( $action_type !== 'delete' ) {
+        // Return the rendered HTML of the new block(s) so frontend can inject it and preview
+        $rendered_markup = do_blocks( $new_block_grammar );
+    }
 
     wp_send_json_success([
         'new_markup'   => $new_block_grammar,
@@ -3533,27 +3541,38 @@ function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks
 }
 
 /**
- * Helper to recursively find a block logically and insert a new block (or blocks) next to it
+ * A recursive helper to insert block(s) adjacent to a reference node.
+ * If `$new_blocks` is an empty array, the `$reference_node` is deleted from the tree.
+ * 
+ * @param array  $parsed_blocks   The current hierarchical blocks array.
+ * @param array  $reference_node  The target block node inside the tree.
+ * @param array  $new_blocks      An array of blocks to insert. Pass [] to delete.
+ * @param string $position        Position ('before', 'after', 'left', 'right', 'top', 'bottom'). Default 'after'.
+ * @return array The mutated block tree.
  */
 function aipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blocks, $position = 'after' ) {
-    if ( empty( $new_blocks ) ) return $parsed_blocks;
+    // If we're not deleting, and there are no new blocks, return early without doing anything.
+    if ( empty( $new_blocks ) && ( !isset($_POST['action_type']) || $_POST['action_type'] !== 'delete' ) ) return $parsed_blocks;
 
     foreach ( $parsed_blocks as $k => &$block ) {
-        // Strict identical check for the node object
         if ( $block === $reference_node ) {
-            if ( $position === 'before' || $position === 'left' || $position === 'top' ) {
-                array_splice( $parsed_blocks, $k, 0, $new_blocks );
+            // Found it. Inject our block(s).
+            if ( isset($_POST['action_type']) && $_POST['action_type'] === 'delete' ) {
+                array_splice( $parsed_blocks, $k, 1, [] ); // Splice out 1 element, inject nothing.
+            } else if ( $position === 'before' || $position === 'left' || $position === 'top' ) {
+                array_splice( $parsed_blocks, $k, 0, $new_blocks ); // 0 means insert without replacing
             } else {
                 array_splice( $parsed_blocks, $k + 1, 0, $new_blocks );
             }
             return $parsed_blocks;
         }
         
+        // Let's check innerBlocks
         if ( ! empty( $block['innerBlocks'] ) ) {
             $updated_inner = aipg_insert_block_in_tree( $block['innerBlocks'], $reference_node, $new_blocks, $position );
             if ( $updated_inner !== $block['innerBlocks'] ) {
                 $block['innerBlocks'] = $updated_inner;
-                return $parsed_blocks; // Return early once found and inserted
+                return $parsed_blocks;
             }
         }
     }
