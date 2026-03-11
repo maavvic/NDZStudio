@@ -461,7 +461,7 @@ function aipg_check_api_connection() {
  * - Junk detection (unique character ratio and consecutive repeats)
  */
 function aipg_validate_input($text, $type = 'new') {
-    $text = trim($text);
+    $text = trim((string)$text);
     $length = mb_strlen($text);
     $word_count = count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY));
 
@@ -564,7 +564,7 @@ function aipg_parse_plugin_headers($code) {
     $data = [];
     foreach ($headers as $key => $regex) {
         if (preg_match('/^[ \t\/*#@]*' . preg_quote($regex, '/') . ':(.*)$/mi', $code, $match) && $match[1]) {
-            $data[$key] = trim($match[1]);
+            $data[$key] = trim((string)$match[1]);
         } else {
             $data[$key] = '';
         }
@@ -1221,7 +1221,7 @@ function aipg_render_page() {
                             $row_class .= ' aipg-row-highlight';
                         }
                     ?>
-                    <tr class="<?php echo esc_attr(trim($row_class)); ?>" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>" data-description="<?php echo esc_attr( $plugin->description ); ?>" data-project-id="<?php echo esc_attr( $plugin->external_project_id ); ?>" data-active-version-id="<?php echo esc_attr( $plugin->active_version_remote_id ); ?>">
+                    <tr class="<?php echo esc_attr(trim((string)$row_class)); ?>" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>" data-description="<?php echo esc_attr( $plugin->description ); ?>" data-project-id="<?php echo esc_attr( $plugin->external_project_id ); ?>" data-active-version-id="<?php echo esc_attr( $plugin->active_version_remote_id ); ?>">
                         <td><input type="checkbox" class="plugin-checkbox" value="<?php echo esc_attr( $plugin->id ); ?>"></td>
                         <td><strong style="font-weight: 500; font-size: 15px;"><?php echo esc_html( $plugin->name ); ?></strong></td>
                         <td>
@@ -1715,7 +1715,7 @@ function aipg_ajax_check_studio_generation_status() {
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $job_id;
 
     $response = wp_remote_get( $endpoint, [
-        'timeout' => 10,
+        'timeout' => 60,
     ]);
 
     if ( is_wp_error( $response ) ) {
@@ -1732,14 +1732,45 @@ function aipg_ajax_check_studio_generation_status() {
     wp_send_json_success( $data );
 }
 
+/**
+ * Rewrites internal links within Studio generated content to point to unique slugs.
+ */
+function aipg_rewrite_studio_links( $content, $slug_map ) {
+    if ( empty( $slug_map ) || empty( $content ) ) {
+        return $content;
+    }
+
+    foreach ( $slug_map as $orig => $new ) {
+        // We use a case-insensitive regex with \b (word boundary) or leading slashes 
+        // to catch variations like href="/practice", href="/Practice/", "url":"/practice", "url":"\/practice"
+        
+        // Pattern matches:
+        // 1. href="/slug" or href='/slug'
+        // 2. "url":"/slug" or "url":"\/slug"
+        // 3. /slug/ (trailing slash)
+        // 4. Case-insensitive (/i)
+        
+        // Escaped slash variation for JSON: \/slug
+        $orig_escaped = str_replace('/', '\/', $orig);
+        $new_escaped = str_replace('/', '\/', $new);
+
+        // Pattern: (prefix quote or escaped slash) / (orig slug) (optional trailing slash) (suffix quote or escaped slash)
+        $pattern = '/([\'"]|\\\\\/)\/' . preg_quote($orig, '/') . '(\/?|\\\\\/?)([\'"]|\\\\\/)/i';
+        $content = preg_replace($pattern, '$1/' . $new . '$2$3', $content);
+    }
+
+    return $content;
+}
+
 add_action( 'wp_ajax_aipg_install_prototype', 'aipg_ajax_install_prototype' );
 function aipg_ajax_install_prototype() {
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $raw_response = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-    $project_id   = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
-    $theme_strategy = isset( $_POST['theme_strategy'] ) ? sanitize_text_field( wp_unslash( $_POST['theme_strategy'] ) ) : 'normalize_css';
+    $layout_id    = isset( $_POST['layout_id'] ) ? sanitize_text_field( wp_unslash( $_POST['layout_id'] ) ) : '';
+    $project_id   = $layout_id; // Normalize for internal use
+    $theme_strategy = isset( $_POST['theme_strategy'] ) ? sanitize_text_field( $_POST['theme_strategy'] ) : get_option( 'aipg_studio_theme_strategy', 'blank_theme' );
     $data = json_decode( $raw_response, true );
 
     if ( ! $data || ! isset( $data['pages'] ) ) {
@@ -1749,88 +1780,141 @@ function aipg_ajax_install_prototype() {
     $installed_pages = [];
     $home_page_id = 0;
 
+    // 1. Build a map of Original Slugs to New (prefixed) Slugs
+    $slug_map = [];
     foreach ( $data['pages'] as $page_data ) {
-        $title   = sanitize_text_field( $page_data['title'] );
-        $slug    = sanitize_title( $page_data['slug'] );
-        $content = $page_data['content']; // Gutenberg blocks
+        $orig_slug = sanitize_title( $page_data['slug'] );
+        $new_slug  = $layout_id ? "{$orig_slug}-{$layout_id}" : $orig_slug;
+        $slug_map[$orig_slug] = $new_slug;
+    }
 
-        // Check if page already exists with this slug to avoid duplicates (searching all statuses)
-        $existing_pages = get_posts([
-            'name'           => $slug,
-            'post_type'      => 'page',
-            'post_status'    => ['publish', 'draft', 'pending', 'private'],
-            'posts_per_page' => 1,
-            'suppress_filters' => true
-        ]);
-        $existing_page = !empty($existing_pages) ? $existing_pages[0] : null;
-        
-        // GUARDRAIL: Strip any template-part blocks (header/footer) or pure header/footer tags 
-        // that the AI might have accidentally included in the page content.
-        // Our FSE templates already include these globally.
+    // 2. Install Pages with rewritten links
+    foreach ( $data['pages'] as $page_data ) {
+        $title      = sanitize_text_field( $page_data['title'] );
+        $orig_slug  = sanitize_title( $page_data['slug'] );
+        $final_slug = $slug_map[$orig_slug];
+        $content    = isset($page_data['content']) ? $page_data['content'] : ''; // GPT/Claude block grammar
+
+        // Rewriting internal links so they point to the correct layout variant
+        $content = aipg_rewrite_studio_links( $content, $slug_map );
+
+        // GUARDRAIL: Strip any template-part blocks
         $content = preg_replace('/<!--\s*wp:template-part\s*{[^}]*"slug":"(header|footer)"[^}]*}\s*\/-->/i', '', $content);
         $content = preg_replace('/<(header|footer)[^>]*>.*?<\/\1>/is', '', $content);
 
         $post_args = [
-            'post_title'   => $title,
-            'post_name'    => $slug,
-            'post_content' => trim($content) . "\n<!-- AI Studio Build: " . current_time('mysql') . " -->",
+            'post_title'   => $title . ($layout_id ? " ({$layout_id})" : ""),
+            'post_name'    => $final_slug,
+            'post_content' => trim((string)$content) . "\n<!-- AI Studio Build: " . current_time('mysql') . " -->",
             'post_status'  => 'publish',
             'post_type'    => 'page',
         ];
 
-        if ( $existing_page ) {
-            error_log("[AI Studio] Updating existing page: {$slug} (ID: {$existing_page->ID}, Status: {$existing_page->post_status})");
-            $post_args['ID'] = $existing_page->ID;
-            $post_id = wp_update_post( $post_args );
-        } else {
-            error_log("[AI Studio] Creating new page: {$slug}");
+        // We ALWAYS insert as new if layout_id is present to avoid collisions with old layouts
+        if ( !empty($layout_id) ) {
             $post_id = wp_insert_post( $post_args );
+        } else {
+            // Legacy/Fallback: Check if exists
+            $existing_pages = get_posts([
+                'name'           => $final_slug,
+                'post_type'      => 'page',
+                'post_status'    => ['publish', 'draft', 'pending', 'private'],
+                'posts_per_page' => 1,
+                'suppress_filters' => true
+            ]);
+            $existing_page = !empty($existing_pages) ? $existing_pages[0] : null;
+
+            if ( $existing_page ) {
+                $post_args['ID'] = $existing_page->ID;
+                $post_id = wp_update_post( $post_args );
+            } else {
+                $post_id = wp_insert_post( $post_args );
+            }
         }
 
         if ( ! is_wp_error( $post_id ) ) {
-            error_log("[AI Studio] SUCCESS: {$slug} (ID: {$post_id}) | Content Length: " . strlen($content));
-            $installed_pages[] = [ 'id' => $post_id, 'slug' => $slug ];
-            if ( strtolower($slug) === 'home' || $home_page_id === 0 ) {
+            $installed_pages[] = [ 'id' => $post_id, 'slug' => $final_slug ];
+            if ( strtolower($orig_slug) === 'home' || $home_page_id === 0 ) {
                 $home_page_id = $post_id;
             }
-            // Mark as an AI Studio page for the editor overlay
             update_post_meta( $post_id, '_aipg_studio_page', '1' );
             if ( ! empty($project_id) ) {
                 update_post_meta( $post_id, '_aipg_project_id', $project_id );
             }
-        } else {
-            error_log("[AI Studio] ERROR installing page {$slug}: " . $post_id->get_error_message());
+            if ( ! empty($layout_id) ) {
+                update_post_meta( $post_id, '_aipg_layout_id', $layout_id );
+            }
         }
     }
 
-    // Set static front page
+    // Set static front page to the home page of THIS specific generation run
     if ( $home_page_id > 0 ) {
         update_option( 'show_on_front', 'page' );
         update_option( 'page_on_front', $home_page_id );
     }
 
+    // 4. Save to Projects Library (so it shows as 'Installed')
+    if ( ! empty( $layout_id ) ) {
+        global $wpdb;
+        $table_projects = $wpdb->prefix . 'aipg_projects';
+        
+        // Check if already registered to avoid duplicates
+        $exists = $wpdb->get_var( $wpdb->prepare( 
+            "SELECT id FROM $table_projects WHERE snapshot LIKE %s", 
+            '%' . $wpdb->esc_like($layout_id) . '%' 
+        ) );
+
+        if ( ! $exists ) {
+            // Extract project name from the data metadata
+            $project_name = isset($data['metadata']['template_name']) ? $data['metadata']['template_name'] : (isset($data['metadata']['name']) ? $data['metadata']['name'] : 'Restored Concept');
+            
+            $snapshot = [
+                'is_cloud'   => true,
+                'job_id'     => $layout_id,
+                'pages'      => $installed_pages,
+                'timestamp'  => current_time('mysql'),
+                'metadata'   => isset($data['metadata']) ? $data['metadata'] : []
+            ];
+
+            $wpdb->insert(
+                $table_projects,
+                [
+                    'time'     => current_time('mysql'),
+                    'name'     => $project_name,
+                    'snapshot' => wp_json_encode($snapshot)
+                ]
+            );
+        }
+    }
+
     // Install Template Parts (Header / Footer) if present
     if ( isset( $data['template_parts'] ) && is_array( $data['template_parts'] ) ) {
         $active_theme = wp_get_theme()->get_stylesheet();
-        error_log("[AI Studio] Found template_parts! Count: " . count($data['template_parts']));
+        
+        // If we are using the Blank Theme strategy, ensure parts are associated with it
+        // even if it's not active YET (we activate it at the end of this function).
+        $target_theme = ($theme_strategy === 'blank_theme') ? 'wpgenerator-blank' : $active_theme;
+        
+        error_log("[AI Studio] Found template_parts! Count: " . count($data['template_parts']) . " Target Theme: {$target_theme}");
         
         foreach ( $data['template_parts'] as $part_data ) {
-            $slug = sanitize_title( $part_data['slug'] );
-            $content = $part_data['content'];
-            $title = ucfirst($slug);
-            error_log("[AI Studio] Processing part slug: {$slug}");
+            $orig_slug = sanitize_title( $part_data['slug'] );
+            $final_slug = $layout_id ? "{$orig_slug}-{$layout_id}" : $orig_slug;
+            $content = aipg_rewrite_studio_links( $part_data['content'], $slug_map );
+            $title = ucfirst($orig_slug) . ($layout_id ? " ({$layout_id})" : "");
+            error_log("[AI Studio] Processing part slug: {$final_slug}");
 
             // Determine the area based on the slug
             $area = 'uncategorized';
-            if ( strpos( $slug, 'header' ) !== false ) {
+            if ( strpos( $orig_slug, 'header' ) !== false ) {
                 $area = 'header';
-            } elseif ( strpos( $slug, 'footer' ) !== false ) {
+            } elseif ( strpos( $orig_slug, 'footer' ) !== false ) {
                 $area = 'footer';
             }
 
             // Attempt to find existing template part for this theme
             $existing_parts = get_posts([
-                'name'           => $slug,
+                'name'           => $final_slug,
                 'post_type'      => 'wp_template_part',
                 'post_status'    => 'publish',
                 'posts_per_page' => 1,
@@ -1838,7 +1922,7 @@ function aipg_ajax_install_prototype() {
                     [
                         'taxonomy' => 'wp_theme',
                         'field'    => 'name',
-                        'terms'    => $active_theme,
+                        'terms'    => $target_theme,
                     ],
                 ]
             ]);
@@ -1846,44 +1930,52 @@ function aipg_ajax_install_prototype() {
 
             $part_args = [
                 'post_title'   => $title,
-                'post_name'    => $slug,
+                'post_name'    => $final_slug,
                 'post_content' => $content,
                 'post_status'  => 'publish',
                 'post_type'    => 'wp_template_part',
+                // Note: tax_input might be ignored for custom post types in some contexts, so we use wp_set_object_terms below
                 'tax_input'    => [
-                    'wp_theme' => [ $active_theme ],
+                    'wp_theme' => [ $target_theme ],
                     'wp_template_part_area' => [ $area ]
                 ]
             ];
 
             if ( $existing_part ) {
-                error_log("[AI Studio] Updating existing template part: {$slug} (Area: {$area})");
+                error_log("[AI Studio] Updating existing template part: {$final_slug} (Area: {$area})");
                 $part_args['ID'] = $existing_part->ID;
-                wp_update_post( $part_args );
-                wp_set_object_terms( $existing_part->ID, $area, 'wp_template_part_area' );
+                $part_id = wp_update_post( $part_args );
             } else {
-                error_log("[AI Studio] Creating new template part: {$slug} (Area: {$area})");
-                $post_id = wp_insert_post( $part_args );
-                if ( ! is_wp_error( $post_id ) ) {
-                    wp_set_object_terms( $post_id, $active_theme, 'wp_theme' );
-                    wp_set_object_terms( $post_id, $area, 'wp_template_part_area' );
+                error_log("[AI Studio] Creating new template part: {$final_slug} (Area: {$area})");
+                $part_id = wp_insert_post( $part_args );
+            }
+
+            if ( ! is_wp_error( $part_id ) && $part_id > 0 ) {
+                // Ensure taxonomy is set correctly regardless of user permissions/context
+                wp_set_object_terms( $part_id, $target_theme, 'wp_theme' );
+                wp_set_object_terms( $part_id, $area, 'wp_template_part_area' );
+                update_post_meta( $part_id, '_aipg_studio_page', '1' );
+                if ( ! empty($layout_id) ) {
+                    update_post_meta( $part_id, '_aipg_layout_id', $layout_id );
                 }
             }
         }
     }
 
-    // Store theme tokens if provided
-    if ( isset( $data['theme_json'] ) ) {
-        error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
-        update_option( 'aipg_studio_theme_config', $data['theme_json'] );
-    } else {
-        // Clear if not provided to avoid stale styles
-        delete_option( 'aipg_studio_theme_config' );
-    }
-
     if ( ! empty($project_id) ) {
          update_option( 'aipg_studio_active_project', $project_id );
     }
+
+    // Update the active layout ID so FSE overrides know which parts to prioritize
+    if ( ! empty($layout_id) ) {
+        update_option( 'aipg_active_layout_id', $layout_id );
+    }
+
+    // Store theme tokens if provided
+    if ( isset( $data['theme_json'] ) && !empty($data['theme_json'])) {
+        error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
+        update_option( 'aipg_studio_theme_config', $data['theme_json'] );
+    } 
 
     // Handle Theme Strategy
     update_option( 'aipg_studio_theme_strategy', $theme_strategy );
@@ -1906,8 +1998,8 @@ function aipg_ajax_install_prototype() {
                 "settings" => [
                     "appearanceTools" => true,
                     "layout" => [
-                        "contentSize" => "800px",
-                        "wideSize" => "1200px"
+                        "contentSize" => "1200px",
+                        "wideSize" => "1600px"
                     ]
                 ]
             ];
@@ -1920,7 +2012,7 @@ function aipg_ajax_install_prototype() {
             $index_html = '<!-- wp:template-part {"slug":"header"} /-->
 <!-- wp:group {"tagName":"main","align":"full","layout":{"type":"constrained"}} -->
 <main class="wp-block-group alignfull">
-<!-- wp:post-content {"layout":{"type":"constrained"}} /-->
+<!-- wp:post-content /-->
 </main>
 <!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->';
@@ -1934,7 +2026,7 @@ function aipg_ajax_install_prototype() {
 
     wp_send_json_success([
         'message'     => 'Real Gutenberg pages installed!',
-        'preview_url' => add_query_arg( '_aipg_preview', time(), home_url('/') )
+        'preview_url' => add_query_arg( '_aipg_preview', $layout_id ?: time(), home_url('/') )
     ]);
 }
 
@@ -1964,9 +2056,9 @@ function aipg_override_fse_template_parts( $block_template, $id, $template_type 
             
             // Serve a blank layout without the disruptive "Front Page" post titles or forced constrained margins
             $block_template->content = '<!-- wp:template-part {"slug":"header"} /-->
-<!-- wp:group {"tagName":"main","align":"full","layout":{"type":"default"},"style":{"spacing":{"margin":{"top":"0"}}}} -->
+<!-- wp:group {"tagName":"main","align":"full","layout":{"type":"constrained"},"style":{"spacing":{"margin":{"top":"0"}}}} -->
 <main class="wp-block-group alignfull" style="margin-top:0">
-<!-- wp:post-content {"layout":{"type":"default"}} /-->
+<!-- wp:post-content /-->
 </main>
 <!-- /wp:group -->
 <!-- wp:template-part {"slug":"footer"} /-->';
@@ -1987,6 +2079,10 @@ function aipg_override_fse_template_parts( $block_template, $id, $template_type 
     // Extract slug from ID (e.g., 'twentytwentyfour//header' -> 'header')
     $slug = str_replace( $active_theme . '//', '', $id );
 
+    // Determine the Layout ID context
+    $post_id   = get_queried_object_id();
+    $layout_id = $post_id ? get_post_meta( $post_id, '_aipg_layout_id', true ) : get_option( 'aipg_active_layout_id', '' );
+
     // Normalize slug to catch variations like 'footer-default' or 'header-dark'
     $search_slug = $slug;
     if ( strpos( $slug, 'header' ) !== false ) {
@@ -1995,20 +2091,48 @@ function aipg_override_fse_template_parts( $block_template, $id, $template_type 
         $search_slug = 'footer';
     }
 
-    // Check if we have an AI Studio override for this normalized part
-    $ai_parts = get_posts([
-        'name'           => $search_slug,
-        'post_type'      => 'wp_template_part',
-        'post_status'    => 'publish',
-        'posts_per_page' => 1,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'wp_theme',
-                'field'    => 'name',
-                'terms'    => $active_theme,
-            ],
-        ]
-    ]);
+    // Attempt to find a layout-specific version first (e.g. header-abc123)
+    if ( ! empty( $layout_id ) ) {
+        $found_parts = get_posts([
+            'name'           => "{$search_slug}-{$layout_id}",
+            'post_type'      => 'wp_template_part',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'tax_query'      => [
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => $active_theme,
+                ],
+            ]
+        ]);
+        if ( ! empty( $found_parts ) ) {
+            $ai_parts = $found_parts;
+        }
+    }
+
+    // Fallback to the generic version if no layout-specific one found
+    if ( empty( $ai_parts ) ) {
+        $ai_parts = get_posts([
+            'name'           => $search_slug,
+            'post_type'      => 'wp_template_part',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'tax_query'      => [
+                'relation' => 'OR',
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => $active_theme,
+                ],
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => 'wpgenerator-blank',
+                ],
+            ]
+        ]);
+    }
 
     if ( ! empty( $ai_parts ) ) {
         $ai_part = $ai_parts[0];
@@ -2043,7 +2167,11 @@ function aipg_force_render_template_part( $block_content, $block ) {
 
     $active_theme = wp_get_theme()->get_stylesheet();
 
-    // Normalize slug to catch variations like 'footer-default' or 'header-dark'
+    // Determine the Layout ID context
+    $post_id   = get_queried_object_id();
+    $layout_id = $post_id ? get_post_meta( $post_id, '_aipg_layout_id', true ) : get_option( 'aipg_active_layout_id', '' );
+
+    // Normalize slug
     $search_slug = $slug;
     if ( strpos( $slug, 'header' ) !== false ) {
         $search_slug = 'header';
@@ -2051,23 +2179,58 @@ function aipg_force_render_template_part( $block_content, $block ) {
         $search_slug = 'footer';
     }
 
-    $ai_parts = get_posts([
-        'name'           => $search_slug,
-        'post_type'      => 'wp_template_part',
-        'post_status'    => 'publish',
-        'posts_per_page' => 1,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'wp_theme',
-                'field'    => 'name',
-                'terms'    => $active_theme,
-            ],
-        ]
-    ]);
+    $ai_parts = [];
+
+    // Attempt layout-specific version (header-abc123)
+    if ( ! empty( $layout_id ) ) {
+        $ai_parts = get_posts([
+            'name'           => "{$search_slug}-{$layout_id}",
+            'post_type'      => 'wp_template_part',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'tax_query'      => [
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => $active_theme,
+                ],
+            ]
+        ]);
+    }
+
+    // Fallback to generic
+    if ( empty( $ai_parts ) ) {
+        $ai_parts = get_posts([
+            'name'           => $search_slug,
+            'post_type'      => 'wp_template_part',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'tax_query'      => [
+                'relation' => 'OR',
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => $active_theme,
+                ],
+                [
+                    'taxonomy' => 'wp_theme',
+                    'field'    => 'name',
+                    'terms'    => 'wpgenerator-blank',
+                ],
+            ]
+        ]);
+    }
 
     if ( ! empty( $ai_parts ) ) {
         $ai_part = $ai_parts[0];
-        return do_blocks( $ai_part->post_content );
+        $inner_html = do_blocks( $ai_part->post_content );
+        
+        // Wrap in a semantic tag with a tracking class so the frontend can detect the atomic unit
+        $tag = ( strpos( $slug, 'footer' ) !== false ) ? 'footer' : ( ( strpos( $slug, 'header' ) !== false ) ? 'header' : 'div' );
+        $attrs = $block['attrs'] ?? [];
+        $class_str = "wp-block-template-part aipg-part-{$slug}";
+        
+        return "<{$tag} class=\"{$class_str}\">{$inner_html}</{$tag}>";
     }
 
     return $block_content;
@@ -2115,10 +2278,27 @@ function aipg_ajax_list_studio_projects() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'aipg_projects';
     
-    $projects = $wpdb->get_results( "SELECT id, name, time as timestamp, snapshot FROM $table_name ORDER BY time DESC", ARRAY_A );
+    // 1. Fetch Local Projects
+    $local_projects = $wpdb->get_results( "SELECT id, name, time as timestamp, snapshot FROM $table_name ORDER BY time DESC", ARRAY_A );
+
+    // 2. Fetch Cloud History from Backend
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
+    $history_endpoint = rtrim($api_url, '/') . '/api/ai-studio/history';
+    
+    $response = wp_remote_get( $history_endpoint, [ 'timeout' => 15 ] );
+    $cloud_history = [];
+    
+    if ( ! is_wp_error( $response ) ) {
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+        if ( isset( $data['history'] ) ) {
+            $cloud_history = $data['history'];
+        }
+    }
 
     wp_send_json_success([
-        'projects'  => $projects,
+        'local'     => $local_projects,
+        'cloud'     => $cloud_history,
         'active_id' => get_option( 'aipg_studio_active_project', '' )
     ]);
 }
@@ -2317,15 +2497,27 @@ function aipg_ajax_studio_contextual_edit() {
 
             if ( $template_part_post && ! empty($template_part_post->content) ) {
                 $is_template_part_mode = true;
-                // Swap the target block payload with the inner contents of the template part
-                error_log("[AI Studio] Successfully extracted inner content of Template Part: {$slug}");
+                // ATOMIC REFINEMENT: Swap the target block payload with the ENTIRE inner contents of the template part.
+                // We also replace the matched node with a virtual root to simplify replacement later.
+                error_log("[AI Studio] Successfully extracted inner content of Template Part: {$slug}. Setting atomic mode.");
                 $serialized_target_block = $template_part_post->content;
+                
+                // Virtual root node representing the entire template part post content
+                $matched_block_node = [
+                    'blockName'    => 'aipg/virtual-tpl-root',
+                    'innerHTML'    => $template_part_post->content,
+                    'innerContent' => [ $template_part_post->content ],
+                    'innerBlocks'  => parse_blocks( $template_part_post->content )
+                ];
             } else {
                 error_log("[AI Studio] Failed to locate inner content for Template Part: {$slug}");
                 wp_send_json_error("Could not load the internal blocks for the {$slug} template part.");
             }
         }
     }
+
+    $site_info = get_option( 'aipg_site_info', [] );
+    $industry  = isset($site_info['industry']) ? $site_info['industry'] : '';
 
     $response = wp_remote_post( $endpoint, [
         'headers'     => [
@@ -2338,6 +2530,7 @@ function aipg_ajax_studio_contextual_edit() {
             'computed_styles' => empty(json_decode($computed_styles, true)) ? null : json_decode($computed_styles),
             'parent_markup'   => $parent_markup,
             'model_tier'      => $model_tier,
+            'industry'        => $industry,
             'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
             'dynamic_db_block'=> $serialized_target_block, // Hijacking this variable name to mean "Block Grammar Mode"
         ]),
@@ -2410,16 +2603,24 @@ function aipg_ajax_studio_contextual_edit() {
         } else {
             // Replace the node in the tree
             $new_parsed_blocks = parse_blocks( $new_block_grammar );
-            $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks, $data['new_markup'], $match_info );
-            
-            if ( $updated_tree === $full_parsed_tree ) {
-                $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
-                error_log($err_msg);
-                file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err_msg, FILE_APPEND);
-            } else {
-                error_log('[AI Studio] SUCCESS: Tree successfully mutated.');
-                file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - SUCCESS: Tree successfully mutated.\n", FILE_APPEND);
+
+            if ( $is_template_part_mode ) {
+                // ATOMIC REFINEMENT: The AI's blocks ARE the new content for the entire post.
+                $updated_tree = $new_parsed_blocks;
                 $tree_mutated = true;
+                $db_diagnostics[] = "Atomic Template Part Refinement: Successfully replaced entire tree.";
+            } else {
+                $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks, $data['new_markup'], $match_info );
+                
+                if ( $updated_tree === $full_parsed_tree ) {
+                    $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
+                    error_log($err_msg);
+                    file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . ' - ' . $err_msg, FILE_APPEND);
+                } else {
+                    error_log('[AI Studio] SUCCESS: Tree successfully mutated.');
+                    file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - SUCCESS: Tree successfully mutated.\n", FILE_APPEND);
+                    $tree_mutated = true;
+                }
             }
 
             // Re-serialize the entire page / template
@@ -2502,13 +2703,15 @@ function aipg_ajax_studio_contextual_edit() {
         
         // Template parts need custom handling in AJAX contexts because do_blocks 
         // often returns generic wrappers rather than their internal HTML tree.
-        if ( strpos($new_block_grammar, 'wp:template-part') !== false ) {
-            $parsed_tp = parse_blocks($new_block_grammar);
+        if ( strpos($new_block_grammar, 'wp:template-part') !== false || $is_template_part_mode ) {
+            $current_grammar = $is_template_part_mode ? $original_template_part_grammar : $new_block_grammar;
+            $parsed_tp = parse_blocks($current_grammar);
+            
             if (!empty($parsed_tp[0])) {
                 $attrs = $parsed_tp[0]['attrs'] ?? [];
                 $slug = $attrs['slug'] ?? '';
                 $theme = $attrs['theme'] ?? wp_get_theme()->get_stylesheet();
-                $tag = $attrs['tagName'] ?? 'div';
+                $tag = $attrs['tagName'] ?? (strpos($slug, 'footer') !== false ? 'footer' : (strpos($slug, 'header') !== false ? 'header' : 'div'));
                 $class_str = "wp-block-template-part aipg-part-{$slug}";
                 
                 $style_data = isset($attrs['style']) ? wp_style_engine_get_styles($attrs['style']) : [];
@@ -2516,15 +2719,15 @@ function aipg_ajax_studio_contextual_edit() {
                     $class_str .= ' ' . $style_data['class'];
                 }
                 
-                // Directly render the AI's modified inner blocks
-                $inner_html = do_blocks( $data['new_markup'] );
+                // If we are in template_part_mode, the $data['new_markup'] already contains the NEW inner grammar.
+                // If not, we use the innerHTML from the parsed block.
+                $inner_grammar = $is_template_part_mode ? $new_block_grammar : $parsed_tp[0]['innerHTML'];
+                $inner_html = do_blocks( $inner_grammar );
                 
-                // Construct the final HTML wrapper that reflects the block's current styling without forceful inline styles
-                // WP 5.9+ FSE themes natively drop most inline 'style' for template-parts on the frontend, so injecting it here hallucinates margins.
+                // Construct the final HTML wrapper
                 $rendered_markup = "<{$tag} class=\"{$class_str}\">{$inner_html}</{$tag}>";
                 
-                // Log the final payload for debugging
-                $db_diagnostics[] = "Final Template Part HTML Length: " . strlen($rendered_markup);
+                $db_diagnostics[] = "Final Template Part HTML Length: " . strlen($rendered_markup) . " (Tag: $tag)";
                 file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - PAYLOAD OUTPUT: " . substr($rendered_markup, 0, 500) . "...\n", FILE_APPEND);
             }
         }
@@ -2573,12 +2776,16 @@ function aipg_ajax_studio_manual_edit() {
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $markup          = isset( $_POST['markup'] ) ? wp_unslash( $_POST['markup'] ) : ''; 
+    $lookup_markup   = isset( $_POST['lookup_markup'] ) ? wp_unslash( $_POST['lookup_markup'] ) : $markup;
     $post_id         = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
     
     $width           = isset( $_POST['width'] ) ? sanitize_text_field( $_POST['width'] ) : ''; // 'full', 'constrained', ''
     $padding_top     = isset( $_POST['padding_top'] ) ? sanitize_text_field( $_POST['padding_top'] ) : '';
     $padding_bottom  = isset( $_POST['padding_bottom'] ) ? sanitize_text_field( $_POST['padding_bottom'] ) : '';
     $bg_color        = isset( $_POST['bg_color'] ) ? sanitize_hex_color( $_POST['bg_color'] ) : '';
+    $text_color      = isset( $_POST['text_color'] ) ? sanitize_hex_color( $_POST['text_color'] ) : '';
+    $font_size       = isset( $_POST['font_size'] ) ? sanitize_text_field( $_POST['font_size'] ) : '';
+    $img_width       = isset( $_POST['img_width'] ) ? sanitize_text_field( $_POST['img_width'] ) : '';
 
     if ( empty( $markup ) || ! $post_id ) {
         wp_send_json_error( 'Incomplete data for manual refinement.' );
@@ -2596,19 +2803,21 @@ function aipg_ajax_studio_manual_edit() {
 
     global $post;
     $post = get_post($post_id);
+    if ( ! $post ) {
+        wp_send_json_error( 'Invalid post ID provided.' );
+    }
     setup_postdata($post);
 
     // 1. Check primary post
     $full_parsed_tree = parse_blocks( $post->post_content );
-    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $markup, $search_debug_log );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
 
     // 2. Scan templates if not found
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
         $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
-        usort($templates, function($a, $b) use ($post) { return 0; }); // Keep simple for manual tweak
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
-            $match = aipg_find_block_in_tree( $test_tree, $markup, $search_debug_log );
+            $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
             if ( $match ) {
                 $matched_block_node = $match;
                 $full_parsed_tree = $test_tree;
@@ -2632,6 +2841,9 @@ function aipg_ajax_studio_manual_edit() {
         'padding_top'    => $padding_top !== '' ? strval($padding_top) : null,
         'padding_bottom' => $padding_bottom !== '' ? strval($padding_bottom) : null,
         'bg_color'       => $bg_color ? strval($bg_color) : null,
+        'text_color'     => $text_color ? strval($text_color) : null,
+        'font_size'      => $font_size ? strval($font_size) : null,
+        'img_width'      => $img_width ? strval($img_width) : null,
     ];
     // If the user cleared the color, we detect it if they pass the literal string 'CLEAR'
     if (isset($_POST['bg_color']) && $_POST['bg_color'] === 'CLEAR') {
@@ -2742,14 +2954,44 @@ function aipg_ajax_load_project() {
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
-    $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
-    if (!$project_id) wp_send_json_error('Missing Project ID');
+    $project_id = isset($_POST['project_id']) ? sanitize_text_field(wp_unslash($_POST['project_id'])) : '';
+    if (empty($project_id)) wp_send_json_error('Missing Project ID');
 
     global $wpdb;
     $table_name = $wpdb->prefix . 'aipg_projects';
-    $project = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table_name WHERE id = %d", $project_id ) );
+    
+    // Try local lookup (supports both numeric and UUID strings if they were saved locally)
+    $project = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table_name WHERE id = %s", $project_id ) );
 
-    if (!$project) wp_send_json_error('Project not found');
+    if (!$project) {
+        // FALLBACK: Check AI Studio Cloud
+        $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
+        $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $project_id;
+        
+        $response = wp_remote_get( $endpoint, [ 'timeout' => 20 ] );
+        if ( is_wp_error( $response ) ) {
+             wp_send_json_error( 'Project not found locally and cloud check failed.' );
+        }
+        
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+        
+        if ( isset($data['response']) && $data['status'] === 'COMPLETED' ) {
+            // Found in cloud!
+            wp_send_json_success([
+                'id'       => $project_id,
+                'name'     => 'Restored from Cloud',
+                'snapshot' => wp_json_encode([
+                    'is_cloud' => true,
+                    'job_id'   => $project_id,
+                    'code'     => $data['response']
+                ]),
+                'source'   => 'cloud'
+            ]);
+        }
+
+        wp_send_json_error('Project not found locally or in cloud.');
+    }
 
     $snapshot = json_decode($project->snapshot, true);
     if (!$snapshot) wp_send_json_error('Invalid snapshot data');
@@ -2811,56 +3053,109 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
     $clean_html = function( $html ) {
         if ( empty( $html ) ) return '';
 
-        // 1. Decode entities so &copy; matches (C)
+        // 1. Decode entities so &copy; matches (C) - multiple passes to handle double encoding
+        $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
         $html = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
         
         // 2. Map smart quotes and common entities to primitive equivalents
-        $search  = array('“', '”', '‘', '’', '—', '–', "\xc2\xa0", '&nbsp;', '·');
-        $replace = array('"', '"', "'", "'", '-', '-', ' ', ' ', '.'); // Map middle dot to dot or just leave?
-        // Actually mapping dot to dot is risky. Let's map it across both.
+        $search  = array('“', '”', '‘', '’', '—', '–', "\xc2\xa0", '&nbsp;', '·', '…');
+        $replace = array('"', '"', "'", "'", '-', '-', ' ', ' ', '.', '...');
         $html = str_replace($search, $replace, $html);
 
-        // 3. Normalize self-closing tags (strip / from <hr />)
+        // 3. Normalize self-closing tags and trailing spaces inside tags
         $html = preg_replace( '/\s*\/>/', '>', $html );
+        $html = preg_replace( '/\s+>/', '>', $html );
         
         // 4. Remove non-functional whitespace
+        // Squeeze into single spaces
         $html = preg_replace( '/\s+/', ' ', $html );
         
         // Remove spaces between tags or at tag boundaries to minimize formatting noise
         $html = preg_replace( '/\s*(<[^>]+>)\s*/', '$1', $html );
         
-        return trim( $html );
+        return trim( (string)$html );
     };
 
     $norm_target = $clean_html( $target_html );
     
-    // Gutenberg generates dynamic layout container classes on the fly (e.g., wp-container-5, wp-container-core-group-is-layout-1234)
-    // These NEVER match between the JS DOM and the PHP server. We must strip them from both sides to achieve an exact match.
+    // Gutenberg generates dynamic layout container classes on the fly (e.g., wp-container-5)
+    // and dynamic IDs (modal-NNN). Browser and PHP often differ in these.
     $strip_volatile_parts = function( $html ) {
         // 1. Strip volatile attributes that WP/Browser might differ on
+        $html = preg_replace('/\bfetchpriority=["\']?[^"\'>\s]*["\']?/i', '', $html);
         $html = preg_replace('/\bdecoding=["\']?[^"\'>\s]*["\']?/i', '', $html);
         $html = preg_replace('/\bloading=["\']?[^"\'>\s]*["\']?/i', '', $html);
+        $html = preg_replace('/\btabindex=["\']?[^"\'>\s]*["\']?/i', '', $html);
+        
+        // 1b. Strip dynamic IDs (like modal-2, modal-8)
+        $html = preg_replace('/\bid=["\']modal-[^"\']*["\']?/', '', $html);
+        
+        // 1c. Strip volatile data attributes and aria attributes that might flicker
+        $html = preg_replace('/\bdata-wp-[^=]+=["\'][^"\']*["\']/i', '', $html);
+        $html = preg_replace('/\baria-[^=]+=["\'][^"\']*["\']/i', '', $html);
 
-        // 2. Normalize and strip dynamic classes
-        $html = preg_replace_callback('/class=["\']([^"\']*)["\']/', function($matches) {
-            $classes = preg_split('/\s+/', trim($matches[1]), -1, PREG_SPLIT_NO_EMPTY);
-            $clean = [];
-            foreach($classes as $c) {
-                // Filter out volatile layout/container/aipg classes
-                if (preg_match('/^wp-container-/i', $c)) continue;
-                if (preg_match('/^is-layout-/i', $c)) continue;
-                if (preg_match('/-is-layout-/i', $c)) continue;
-                if (preg_match('/^aipg-/i', $c)) continue;
+        // 2. Normalize and strip dynamic classes + sort ALL attributes to ensure consistency
+        $html = preg_replace_callback('/(<[a-zA-Z0-9]+)([^>]*)(>)/', function($matches) {
+            $tag_start = $matches[1];
+            $attrs_raw = $matches[2];
+            $tag_end = $matches[3];
+            
+            // Extract all attributes
+            preg_match_all('/\b([a-zA-Z0-9-]+)=["\']([^"\']*)["\']/', $attrs_raw, $attr_matches, PREG_SET_ORDER);
+            
+            $clean_attrs = [];
+            foreach ($attr_matches as $am) {
+                $name = strtolower($am[1]);
+                $val = trim((string)$am[2]);
                 
-                $c = trim($c, '-'); // Clean up leftovers
-                if ($c) $clean[] = $c;
+                // Skip empty attributes (like style="") or volatile ones
+                if ($val === '') continue;
+
+                if ($name === 'class') {
+                    $classes = preg_split('/\s+/', $val, -1, PREG_SPLIT_NO_EMPTY);
+                    $filtered_classes = [];
+                    foreach ($classes as $c) {
+                        if (preg_match('/^wp-container-/i', $c)) continue;
+                        if (preg_match('/^is-layout-/i', $c)) continue;
+                        if (preg_match('/-is-layout-/i', $c)) continue;
+                        if (preg_match('/^aipg-/i', $c)) continue;
+                        $filtered_classes[] = $c;
+                    }
+                    if (!empty($filtered_classes)) {
+                        sort($filtered_classes);
+                        $clean_attrs['class'] = 'class="' . implode(' ', array_unique($filtered_classes)) . '"';
+                    }
+                } elseif ($name === 'style') {
+                    // Normalize style properties: split, trim, sort
+                    $props = explode(';', $val);
+                    $normalized_props = [];
+                    foreach ($props as $p) {
+                        $p = trim((string)$p);
+                        if (empty($p)) continue;
+                        $parts = explode(':', $p, 2);
+                        if (count($parts) === 2) {
+                            $prop_name = strtolower(trim((string)$parts[0]));
+                            $prop_val = trim((string)$parts[1]);
+                            $normalized_props[] = $prop_name . ':' . $prop_val;
+                        }
+                    }
+                    if (!empty($normalized_props)) {
+                        sort($normalized_props);
+                        $clean_attrs['style'] = 'style="' . implode(';', $normalized_props) . ';"';
+                    }
+                } else {
+                    $clean_attrs[$name] = $name . '="' . $val . '"';
+                }
             }
-            sort($clean);
-            return $clean ? 'class="' . implode(' ', array_unique($clean)) . '"' : '';
+            
+            if (empty($clean_attrs)) return $tag_start . $tag_end;
+            
+            ksort($clean_attrs); // Sort attributes by name
+            return $tag_start . ' ' . implode(' ', $clean_attrs) . $tag_end;
         }, $html);
 
         // 3. Final whitespace squeeze
-        return preg_replace( '/\s+/', ' ', trim($html) );
+        return preg_replace( '/\s+/', ' ', trim((string)$html) );
     };
 
     // The safest target representation is with dynamic classes stripped
@@ -2935,8 +3230,8 @@ function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks
                 // The user selected an inner text element (like <p>) that doesn't have its own WP comment block.
                 // We MUST preserve the outer block wrapper and only str_replace the innerHTML.
                 
-                $target = trim($match_info['target']);
-                $replacement = trim($new_raw_html);
+                $target = trim((string)$match_info['target']);
+                $replacement = trim((string)$new_raw_html);
                 
                 // 1. We must unwrap the replacement if the AI accidentally wrapped it in WP comments
                 // because we are injecting INSIDE an existing WP comment block.
@@ -2944,13 +3239,24 @@ function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks
                 $replacement = preg_replace('/\s*<!--\s*\/wp:[a-zA-Z0-9-]+\s*-->$/', '', $replacement);
                 
                 // 2. Perform surgical string replacement on the block's content arrays
+                // We use a more guarded replacement to avoid duplicating content if $target appears multiple times
+                // though in a single block's innerHTML it usually represents the exact selected node.
+                $replace_logic = function($haystack, $search, $replace) {
+                    if (!is_string($haystack)) return $haystack;
+                    $pos = strpos($haystack, $search);
+                    if ($pos !== false) {
+                        return substr_replace($haystack, $replace, $pos, strlen($search));
+                    }
+                    return $haystack;
+                };
+
                 if ( isset($block['innerHTML']) ) {
-                    $block['innerHTML'] = str_replace( $target, $replacement, $block['innerHTML'] );
+                    $block['innerHTML'] = $replace_logic( $block['innerHTML'], $target, $replacement );
                 }
                 if ( isset($block['innerContent']) && is_array($block['innerContent']) ) {
                     foreach ( $block['innerContent'] as $ic_key => $ic_val ) {
                         if ( is_string($ic_val) ) {
-                            $block['innerContent'][$ic_key] = str_replace( $target, $replacement, $ic_val );
+                            $block['innerContent'][$ic_key] = $replace_logic( $ic_val, $target, $replacement );
                         }
                     }
                 }

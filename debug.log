@@ -327,3 +327,52 @@
 2026-03-09 16:09:34 - [AI Studio] FATAL ERROR during replacement: aipg_find_block_in_tree(): Argument #3 ($debug_log) could not be passed by reference in /var/www/html/wp-content/plugins/WPTemplateGenerator/WPPluginAIGenerator.php:2460
 2026-03-09 16:11:44 - [AI Studio] CRITICAL WARNING: $updated_tree is identical to $full_parsed_tree! find_block and replace_block array comparison ($block === $original_node) FAILED to match!
 2026-03-09 16:11:44 - DB Diags: ["No active_template, updating original post ID: 78","Updated ID: 78","Partial Match Re-wrap Failed: Could not locate new string in tree."]
+2026-03-09 21:32:09 - DB Diags: ["Updating existing DB Template Part Post ID: 134","Successfully saved Template Part DB ID: 134"]
+2026-03-09 21:32:33 - DB Diags: ["Updating existing DB Template Part Post ID: 134","Successfully saved Template Part DB ID: 134"]
+2026-03-09 21:32:59 - DB Diags: ["Updating existing DB Template Part Post ID: 134","Successfully saved Template Part DB ID: 134"]
+2026-03-09 21:33:38 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135"]
+2026-03-09 21:41:01 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer">
+<div class="wp-block-group alignfull is-layout-flow wp-block-group-is-layout-flow" style="background-color:#1a2e06;padding-top:clamp(3rem,6vw,6rem);padding-bottom:clamp(2rem,4vw,3rem);padding-left:clamp(1.5rem,5vw,4rem);padding-right:clamp(1.5rem,5vw,4rem)">
+
+
+<div class="wp-block-columns alignwide is-layout-flex wp-container-core-columns-is-layout-8d8363f7 wp-block-columns-is-layout-flex" style="margin-bottom:clamp(3rem,6vw,5rem)">
+
+
+<div...
+2026-03-09 21:41:01 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135","Final Template Part HTML Length: 7902 (Tag: footer)"]
+2026-03-09 21:42:10 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer">
+<div class="wp-block-group alignfull is-layout-flow wp-block-group-is-layout-flow" style="background-color:#1a2e06;padding-top:clamp(3rem,6vw,6rem);padding-bottom:clamp(2rem,4vw,3rem);padding-left:clamp(1.5rem,5vw,4rem);padding-right:clamp(1.5rem,5vw,4rem);color:#ffffff">
+
+
+<div class="wp-block-columns alignwide is-layout-flex wp-container-core-columns-is-layout-8d8363f7 wp-block-columns-is-layout-flex" style="margin-bottom:clamp(3rem,6vw,...
+2026-03-09 21:42:10 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135","Final Template Part HTML Length: 7916 (Tag: footer)"]
+2026-03-09 21:44:18 - SUCCESS: Tree successfully mutated.
+2026-03-09 21:44:18 - DB Diags: ["No active_template, updating original post ID: 6","Updated ID: 6"]
+2026-03-09 21:44:34 - SUCCESS: Tree successfully mutated.
+2026-03-09 21:44:34 - DB Diags: ["No active_template, updating original post ID: 6","Updated ID: 6"]
+2026-03-09 21:46:26 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer">
+<div class="wp-block-group alignfull is-layout-flow wp-block-group-is-layout-flow" style="background-color:#1a2e06;padding-top:clamp(3rem,6vw,6rem);padding-bottom:clamp(2rem,4vw,3rem);padding-left:clamp(1.5rem,5vw,4rem);padding-right:clamp(1.5rem,5vw,4rem);color:#ffffff;font-family:system-ui,-apple-system,sans-serif">
+
+
+<div class="wp-block-columns alignwide is-layout-flex wp-container-core-columns-is-layout-8d8363f7 wp-block-columns-is-la...
+2026-03-09 21:46:26 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135","Final Template Part HTML Length: 8722 (Tag: footer)"]
+2026-03-09 21:47:26 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer">
+<h2 class="wp-block-heading" style="color:#ffffff;font-size:clamp(3rem,7vw,7rem);line-height:0.88;letter-spacing:-0.04em;font-weight:900;font-family:inherit">ELEMENTAL<br>WELLNESS<br>FLOW</h2>
+</footer>...
+2026-03-09 21:47:26 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135","Final Template Part HTML Length: 259 (Tag: footer)"]
+2026-03-09 21:52:01 - PAYLOAD OUTPUT: <footer class="wp-block-template-part aipg-part-footer">
+<div class="wp-block-group alignfull is-layout-flow wp-block-group-is-layout-flow" style="background-color:#0d0a2e;padding-top:clamp(3rem,6vw,6rem);padding-bottom:2rem;padding-left:clamp(1.5rem,5vw,5rem);padding-right:clamp(1.5rem,5vw,5rem);">
+
+  
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:3rem;padding-bottom:3rem;border-bottom:1px solid rgba(255,255,255,0.1);color:#ffffff;">
+    <div...
+2026-03-09 21:52:01 - DB Diags: ["Updating existing DB Template Part Post ID: 135","Successfully saved Template Part DB ID: 135","Final Template Part HTML Length: 2832 (Tag: footer)"]
+2026-03-09 21:52:41 - PAYLOAD OUTPUT: <header class="wp-block-template-part aipg-part-header">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+
+
+<div class="wp-block-group alignfull is-layout-flow wp-block-group-is-layout-flow" style="background-color:#130f40;padding-top:1.25rem;padding-bottom:1.25rem;padding-left:clamp(1.5rem,5vw,5rem);padding-right:clamp(1.5rem,5vw,5rem);">
+  
+  <div style="display:flex;align-items:center;justify-content:sp...
+2026-03-09 21:52:41 - DB Diags: ["Updating existing DB Template Part Post ID: 134","Successfully saved Template Part DB ID: 134","Final Template Part HTML Length: 1803 (Tag: header)"]

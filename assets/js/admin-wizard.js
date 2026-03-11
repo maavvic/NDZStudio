@@ -334,13 +334,20 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     }
                     if (!WPStudioWizard.templates || WPStudioWizard.templates.length === 0) {
                         const pct = WPStudioWizard.data.templateProgress || 0;
-                        const statusTxt = pct > 0 ? `Architecting your options... ${pct}%` : `AI is thinking and architecting...`;
+                        const statusTxt = `Architecting your options... ${pct}%`;
                         return `<div class="ws-ai-loading">
                                     <div class="ws-mini-spinner"></div> 
                                     <div id="ws-step5-status-text">${statusTxt}</div>
                                 </div>`;
                     }
                     return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                            <h3 style="margin:0; font-size:16px; font-weight:600;">AI Proposals</h3>
+                            <button class="ws-btn ws-btn-secondary ws-btn-sm" onclick="WPStudioWizard.regenerateTemplates()" id="ws-btn-regenerate" style="padding: 8px 15px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:5px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                Regenerate Proposals
+                            </button>
+                        </div>
                         <div class="ws-template-grid">
                             ${WPStudioWizard.templates.map((t, idx) => `
                                 <div class="ws-template-card ${WPStudioWizard.data.template && WPStudioWizard.data.template.name === t.name ? 'active' : ''}" data-idx="${idx}">
@@ -434,18 +441,55 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
         init: function () {
             try {
-                console.log('%c[Wizard] Init Started. currentStep: ' + this.currentStep, 'color: #0071e3; font-weight: bold;');
-                this.goToStep(0);
+                console.log('%c[Wizard] Init Started. Loading state...', 'color: #0071e3; font-weight: bold;');
+
+                this.loadState();
+
+                console.log('[Wizard] State loaded. Current step:', this.currentStep);
+                this.goToStep(this.currentStep);
                 this.bindEvents();
             } catch (e) {
                 console.error('%c[Wizard Init Error]', 'color: white; background: red; padding: 5px;', e);
             }
         },
 
+        saveState: function () {
+            const state = {
+                currentStep: this.currentStep,
+                data: this.data
+            };
+            localStorage.setItem('aipg_wizard_state', JSON.stringify(state));
+            console.log('[Wizard] State saved to localStorage.');
+        },
+
+        loadState: function () {
+            const saved = localStorage.getItem('aipg_wizard_state');
+            if (saved) {
+                try {
+                    const state = JSON.parse(saved);
+                    // Merge saved data with default to handle schema changes
+                    this.data = $.extend(true, {}, this.data, state.data);
+                    this.currentStep = state.currentStep || 0;
+                    return true;
+                } catch (e) {
+                    console.error('[Wizard] Failed to parse saved state:', e);
+                }
+            }
+            return false;
+        },
+
+        clearState: function () {
+            localStorage.removeItem('aipg_wizard_state');
+            console.log('[Wizard] State cleared.');
+        },
+
         goToStep: function (stepIdx) {
             this.currentStep = stepIdx;
             const step = this.steps[this.currentStep];
             console.log(`[Wizard] Moving to Step: ${this.currentStep} -> ${step.title}`);
+
+            // Save progress
+            this.saveState();
 
             // Render first to show loading state if needed
             this.render();
@@ -470,10 +514,16 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             <h2 class="ws-title">${step.title}</h2>
                             <p class="ws-subtitle">${step.subtitle}</p>
                         </div>
-                        <button class="ws-btn ws-btn-secondary ws-btn-sm" id="ws-btn-my-projects">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                            My Projects
-                        </button>
+                        <div style="display:flex; gap:10px;">
+                            <button class="ws-btn ws-btn-secondary ws-btn-sm" id="ws-btn-start-over" title="Start from scratch">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:5px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                Start Over
+                            </button>
+                            <button class="ws-btn ws-btn-secondary ws-btn-sm" id="ws-btn-my-projects">
+                                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                                My Projects
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="ws-step-content">
@@ -511,6 +561,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
                 $('.ws-option-card').removeClass('active');
                 $(this).addClass('active');
+
+                // Save selection immediately
+                self.saveState();
             });
 
             $(document).on('click', '.ws-palette-card', function () {
@@ -533,6 +586,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
                 $this.parent().find('.ws-palette-card').removeClass('active');
                 $this.addClass('active');
+
+                // Save palette
+                self.saveState();
             });
 
             $(document).on('click', '.ws-template-card', function () {
@@ -540,6 +596,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 self.data.template = self.templates[idx];
                 $('.ws-template-card').removeClass('active').find('.ws-template-actions').hide();
                 $(this).addClass('active').find('.ws-template-actions').fadeIn();
+
+                // Save template selection
+                self.saveState();
             });
 
             $(document).on('click', '.ws-btn-preview', function (e) {
@@ -586,6 +645,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
             $(document).on('click', '#ws-btn-my-projects', function () {
                 self.showProjectsView();
+            });
+
+            $(document).on('click', '#ws-btn-start-over', function () {
+                if (confirm('Are you sure you want to start over? All current selections will be cleared.')) {
+                    self.clearState();
+                    location.reload(); // Refresh to clean reset state
+                }
             });
 
             $(document).on('click', '.ws-btn-save-project', function (e) {
@@ -646,7 +712,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 </div>
             `);
 
-            console.log('[Wizard] Starting Final Generation for:', template.name);
+            const layoutId = Math.random().toString(36).substring(2, 8);
+            console.log('[Wizard] Starting Final Generation for:', template.name, 'with Layout ID:', layoutId);
 
             const payload = {
                 action: 'aipg_generate_studio_prototype',
@@ -664,10 +731,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 timeout: 30000,
                 success: function (res) {
                     if (res.success && res.data.job_id) {
-                        self.pollStudioJob(res.data.job_id);
+                        self.pollStudioJob(res.data.job_id, layoutId);
                     } else if (res.success && res.data.status === 'COMPLETED') {
                         // Instant completion fallback
-                        self.installArchitecture(res.data.response, template.name);
+                        self.installArchitecture(res.data.response, template.name, layoutId);
                     } else {
                         const errorMsg = (res && res.data) ? res.data : 'The AI engine might be busy.';
                         self.showError('Generation initiation failed: ' + errorMsg, true);
@@ -679,7 +746,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             });
         },
 
-        pollStudioJob: function (jobId) {
+        pollStudioJob: function (jobId, layoutId) {
             const self = this;
             const template = this.data.template;
 
@@ -693,13 +760,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     const tokens = res.data.completion_tokens || 0;
 
                     // Use 20,000 tokens as the baseline for 100% of a full layout archetype
-                    let percent = tokens > 0 ? Math.min(99, Math.round((tokens / 20000) * 100)) : 0;
+                    const pct = Math.min(99, Math.round((res.data.completion_tokens / 40000) * 100));
 
                     if (status === 'COMPLETED') {
                         $('#ws-finish-progress-fill').css('width', '100%');
                         $('#ws-finish-percentage').text('100%');
                         $('#ws-finish-status').text('Installing your custom WordPress environment...');
-                        self.installArchitecture(res.data.response, template.name);
+                        self.installArchitecture(res.data.response, template.name, layoutId);
                     } else if (status === 'FAILED') {
                         self.showError('AI Generation failed. The server might be overloaded or returned invalid data.', true);
                     } else {
@@ -713,26 +780,29 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         else if (percent > 40) $('#ws-finish-status').text('Generating block content and layouts...');
                         else $('#ws-finish-status').text('Streaming visual vision from AI...');
 
-                        setTimeout(() => self.pollStudioJob(jobId), 3000);
+                        setTimeout(() => self.pollStudioJob(jobId, layoutId), 3000);
                     }
                 } else {
                     console.error('[Wizard] Polling error:', res.data);
                     // Silent retry for network blips
-                    setTimeout(() => self.pollStudioJob(jobId), 5000);
+                    setTimeout(() => self.pollStudioJob(jobId, layoutId), 5000);
                 }
             });
         },
 
-        installArchitecture: function (code, templateName) {
+        installArchitecture: function (code, templateName, layoutId) {
             const self = this;
             $.post(ajaxurl, {
                 action: 'aipg_install_prototype',
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 code: code,
                 template_name: templateName,
-                theme_strategy: self.data.themeStrategy
+                theme_strategy: self.data.themeStrategy,
+                layout_id: layoutId
             }, function (installRes) {
                 if (installRes.success) {
+                    // Success! Clear state as the task is finished
+                    self.clearState();
                     self.showSuccess(installRes.data.preview_url);
                 } else {
                     self.showError('Installation failed: ' + installRes.data);
@@ -941,8 +1011,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     const status = res.data.status;
                     const tokens = res.data.completion_tokens || 0;
 
-                    // Estimate percentage (templates are around 3000 tokens usually)
-                    let percent = tokens > 0 ? Math.min(99, Math.round((tokens / 3000) * 100)) : 0;
+                    // Estimate percentage (3 templates are around 3000 tokens)
+                    let percent = Math.min(99, Math.round((tokens / 3000) * 100));
                     if (percent > self.data.templateProgress || tokens === 0) {
                         self.data.templateProgress = percent;
 
@@ -973,6 +1043,14 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     setTimeout(() => self.pollTemplatesJob(jobId), 5000);
                 }
             });
+        },
+        regenerateTemplates: function () {
+            this.templates = null;
+            this.data.template = null;
+            this.data.templateProgress = 0;
+            this.saveState();
+            this.fetchTemplates();
+            this.render();
         },
 
         retry: function () {
@@ -1080,19 +1158,25 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             $btn.prop('disabled', false).css('opacity', 1);
                         } else {
                             const tokens = sData.completion_tokens || 0;
+                            const updatedAt = sData.updated_at ? new Date(sData.updated_at) : null;
+                            const now = new Date();
+                            const isStalled = updatedAt && (now - updatedAt > 60000); // 1 minute without update
+
                             if (tokens > 0) {
-                                // Calculate actual percentage based on ~20,000 token estimate for a full layout
-                                let pct = Math.floor((tokens / 20000) * 100);
+                                // Calculate actual percentage based on ~40,000 token estimate for a 6-page site
+                                let pct = Math.floor((tokens / 40000) * 100);
                                 if (pct > 99) pct = 99;
 
                                 // Ensure progress never goes backward
                                 if (pct > currentProgress) {
                                     currentProgress = pct;
                                     $status.find('.ws-progress-fill').css('width', currentProgress + '%');
-                                    $status.find('.ws-status-text').text(`Architecting structure... ${currentProgress}%`);
+                                    $status.find('.ws-status-text').text(`Populating pages... ${currentProgress}%`);
+                                } else if (isStalled) {
+                                    $status.find('.ws-status-text').text(`Refining details... ${currentProgress}%`);
                                 }
                             } else {
-                                $status.find('.ws-status-text').text('AI is thinking...');
+                                $status.find('.ws-status-text').text('AI is architecting... ');
                             }
                         }
                     } else {
@@ -1139,35 +1223,87 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 action: 'aipg_list_studio_projects',
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : ''
             }, function (res) {
-                if (res.success && res.data.projects.length > 0) {
-                    self.renderRecentProjects(res.data.projects);
+                if (res.success) {
+                    self.renderRecentProjects(res.data.local || [], res.data.cloud || []);
                 } else {
                     $('#ws-recent-projects-list').html('<p style="color:#999; font-size:13px; font-style:italic;">No saved projects found. Your first design journey starts here!</p>');
                 }
             });
         },
 
-        renderRecentProjects: function (projects) {
-            const listHtml = projects.map(pj => `
-                <div class="ws-project-mini-card">
-                    <div class="ws-pj-info">
-                        <strong>${pj.name}</strong>
-                        <span>${new Date(pj.timestamp).toLocaleString()}</span>
-                    </div>
-                    <div class="ws-pj-actions">
-                        <button class="ws-btn ws-btn-sm ws-btn-primary ws-btn-load-project" data-id="${pj.id}">Load & Edit</button>
-                        <button class="ws-btn ws-btn-sm ws-btn-secondary ws-btn-delete-project" data-id="${pj.id}" title="Delete">
-                             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-            $('#ws-recent-projects-list').html(listHtml);
+        renderRecentProjects: function (local, cloud) {
+            if (!local.length && !cloud.length) {
+                $('#ws-recent-projects-list').html('<p style="color:#999; font-size:13px; font-style:italic;">No saved projects found. Your first design journey starts here!</p>');
+                return;
+            }
+
+            let tableHtml = `
+                <table class="ws-library-table">
+                    <thead>
+                        <tr>
+                            <th>Concept / Prototype</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th style="text-align:right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            // Extract job_ids from local snapshots to detect if a cloud project is installed
+            const installedCloudIds = local.map(pj => {
+                try {
+                    const snap = JSON.parse(pj.snapshot);
+                    return snap.job_id || null;
+                } catch (e) { return null; }
+            }).filter(id => id !== null);
+
+            // 1. Render Local (Installed)
+            local.forEach(pj => {
+                tableHtml += `
+                    <tr>
+                        <td>
+                            <strong>${pj.name}</strong><br/>
+                            <span style="font-size:11px; color:#888;">Installed on this site</span>
+                        </td>
+                        <td><span class="ws-badge ws-badge-installed">Installed</span></td>
+                        <td>${new Date(pj.timestamp).toLocaleDateString()} ${new Date(pj.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style="text-align:right">
+                            <button class="ws-btn ws-btn-sm ws-btn-primary ws-btn-load-project" data-id="${pj.id}">Open Editor</button>
+                            <button class="ws-btn ws-btn-sm ws-btn-danger ws-btn-delete-project" data-id="${pj.id}" title="Delete">×</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // 2. Render Cloud (Remote Only)
+            cloud.forEach(pj => {
+                if (installedCloudIds.includes(pj.id)) return;
+                tableHtml += `
+                    <tr>
+                        <td>
+                            <strong>${pj.name}</strong><br/>
+                            <span style="font-size:11px; color:#888;">${pj.industry} | ${pj.style}</span>
+                        </td>
+                        <td><span class="ws-badge ws-badge-cloud">Cloud Ready</span></td>
+                        <td>${new Date(pj.timestamp).toLocaleDateString()} ${new Date(pj.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style="text-align:right">
+                            <button class="ws-btn ws-btn-sm ws-btn-secondary ws-btn-load-project" data-id="${pj.id}" data-source="cloud">Restore & Install</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `</tbody></table>`;
+            $('#ws-recent-projects-list').html(tableHtml);
         },
 
         loadProject: function (id) {
+            const self = this;
             const $btn = $(`.ws-btn-load-project[data-id="${id}"]`);
-            $btn.text('Loading...').prop('disabled', true);
+            const isCloud = $btn.data('source') === 'cloud';
+
+            $btn.text(isCloud ? 'Installing...' : 'Loading...').prop('disabled', true);
 
             $.post(ajaxurl, {
                 action: 'aipg_load_project',
@@ -1175,10 +1311,47 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 project_id: id
             }, function (res) {
                 if (res.success) {
-                    window.location.href = res.data.redirect_url;
+                    if (res.data.snapshot) {
+                        try {
+                            const snapshot = JSON.parse(res.data.snapshot);
+                            if (snapshot.is_cloud) {
+                                // Triggers the installation flow for a cloud job
+                                return self.installFromCloud(snapshot.job_id, snapshot.code, $btn);
+                            }
+                        } catch (e) {
+                            console.error("[Wizard] Failed to parse snapshot:", e);
+                        }
+                    }
+
+                    // Standard local restore logic (or fallback if parsing failed/not cloud)
+                    if (res.data.redirect_url) {
+                        window.location.href = res.data.redirect_url;
+                    } else {
+                        alert('Project restored, but no redirect URL found.');
+                        $btn.text('Open Editor').prop('disabled', false);
+                    }
                 } else {
-                    alert('Load failed: ' + res.data);
-                    $btn.text('Load & Edit').prop('disabled', false);
+                    alert('Failed to load project: ' + (typeof res.data === 'string' ? res.data : 'Unknown error'));
+                    $btn.text(isCloud ? 'Restore & Install' : 'Open Editor').prop('disabled', false);
+                }
+            });
+        },
+
+        installFromCloud: function (jobId, code, $btn) {
+            const self = this;
+            $.post(ajaxurl, {
+                action: 'aipg_install_prototype',
+                nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
+                code: code,
+                layout_id: jobId
+            }, function (installRes) {
+                if (installRes.success) {
+                    // Once installed, we re-fetch to update the table
+                    self.fetchRecentProjects();
+                    alert('Success! Concept restored and installed as a new layout.');
+                } else {
+                    alert('Installation failed: ' + installRes.data);
+                    $btn.text('Restore & Install').prop('disabled', false);
                 }
             });
         },

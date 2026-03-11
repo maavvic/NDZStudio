@@ -9,6 +9,7 @@
         $overlay: null,
         $label: null,
         $currentBlock: null,
+        originalBlockMarkup: null,
         isEditing: false,
         aiEnabled: true,
         outlinesEnabled: false,
@@ -34,63 +35,132 @@
                 <!-- AI Editor Sidebar -->
                 <div class="aipg-editor-modal" id="aipg-refine-modal">
                     <div class="aipg-sidebar-header">
-                        <h3>Edit Block</h3>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="aipg-logo-sparkle">✨</div>
+                            <h3 style="margin:0; font-size:15px;">AI Studio Builder</h3>
+                        </div>
                         <button class="ws-btn-secondary" id="aipg-close-sidebar-btn" style="padding: 4px 8px; margin: 0; background: transparent; color: #888;">✕</button>
                     </div>
 
                     <div class="aipg-sidebar-tabs">
                         <button class="aipg-tab-btn active" data-tab="ai-prompt">AI Magic</button>
-                        <button class="aipg-tab-btn" data-tab="manual-tweaks">Manual Tweaks</button>
+                        <button class="aipg-tab-btn" data-tab="manual-style">Styles</button>
+                        <button class="aipg-tab-btn" data-tab="add-blocks">Add</button>
                     </div>
 
-                    <!-- AI Tab -->
-                    <div class="aipg-tab-content active" id="tab-ai-prompt">
-                        <p style="font-size: 12px; color: #888; margin-top: 0;">Provide a prompt to AI to modify this block structure or styling.</p>
-                        <textarea id="aipg-prompt-input" placeholder="e.g., 'Make this heading more professional', 'Change this background'"></textarea>
-                        
-                        <div class="aipg-control-group" style="margin-top: 15px;">
-                            <button class="ws-btn-primary" id="aipg-submit-edit" style="width: 100%;">Refine with AI</button>
+                    <div class="aipg-sidebar-scroll-area">
+                        <!-- AI Tab -->
+                        <div class="aipg-tab-content active" id="tab-ai-prompt">
+                            <p style="font-size: 12px; color: #888; margin-top: 0;">Describe what you want to change, and AI will rebuild the block for you.</p>
+                            <textarea id="aipg-prompt-input" placeholder="e.g., 'Make this heading more professional', 'Change this background'"></textarea>
+                            
+                            <div class="aipg-control-group" style="margin-top: 15px;">
+                                <button class="ws-btn-primary" id="aipg-submit-edit" style="width: 100%;">Refine with AI</button>
+                            </div>
+
+                            <div id="aipg-ai-polish-hint" style="margin-top: 15px; padding: 10px; background: rgba(230, 126, 34, 0.1); border-radius: 6px; border-left: 3px solid #e67e22; display: none;">
+                                <p style="font-size: 11px; margin: 0; color: #e67e22; line-height: 1.4;">
+                                    <strong>AI Polish Mode:</strong> You've made manual changes. Mention them in your prompt if you want AI to "perfect" them.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Style Tab (Manual Overrides) -->
+                        <div class="aipg-tab-content" id="tab-manual-style">
+                            <div class="aipg-control-group">
+                                <label class="aipg-control-label">Background Color</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="color" id="aipg-manual-bg-color" value="#000000" style="width: 44px; padding: 2px; cursor: pointer; height: 32px;">
+                                    <button class="ws-btn-secondary" id="aipg-clear-bg-color" style="flex: 1; margin: 0; font-size: 11px; padding: 4px;">Clear</button>
+                                </div>
+                            </div>
+
+                            <div class="aipg-control-divider">Typography</div>
+
+                            <div class="aipg-control-group">
+                                <label class="aipg-control-label">Font Size (px)</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="aipg-manual-fs-range" min="8" max="120" step="1" value="16">
+                                    <input type="number" id="aipg-manual-fs-num" value="16" style="width: 50px; text-align: center; font-size: 11px;">
+                                </div>
+                            </div>
+
+                            <div class="aipg-control-group">
+                                <label class="aipg-control-label">Text Color</label>
+                                <input type="color" id="aipg-manual-text-color" value="#ffffff" style="height: 32px; padding: 2px;">
+                            </div>
+
+                            <div class="aipg-control-divider">Layout & Spacing</div>
+
+                            <div class="aipg-control-group">
+                                <label class="aipg-control-label">Padding (Top/Bottom)</label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <input type="number" id="aipg-manual-pt" placeholder="Top" title="Padding Top (REM)">
+                                    <input type="number" id="aipg-manual-pb" placeholder="Bottom" title="Padding Bottom (REM)">
+                                </div>
+                            </div>
+
+                            <div class="aipg-control-group">
+                                <label class="aipg-control-label">Width Constraints</label>
+                                <select id="aipg-manual-width">
+                                    <option value="">Default (From Theme)</option>
+                                    <option value="constrained">Content Width</option>
+                                    <option value="full">Full Width</option>
+                                </select>
+                            </div>
+
+                            <div class="aipg-media-section" id="aipg-image-controls" style="margin-top: 15px; background: #2a2a2a; padding: 12px; border-radius: 8px; border: 1px dashed #444;">
+                                <label class="aipg-control-label">Image Settings</label>
+                                <button class="ws-btn-secondary" id="aipg-change-media-btn" style="width: 100%; margin-bottom: 10px; font-size: 12px;">🖼️ Swap Image</button>
+                                <label class="aipg-control-label">Max Width (%)</label>
+                                <input type="range" id="aipg-manual-img-width" min="10" max="100" step="1" value="100">
+                            </div>
+                        </div>
+
+                        <!-- Add Tab -->
+                        <div class="aipg-tab-content" id="tab-add-blocks">
+                            <p style="font-size: 11px; color: #888; margin-top: 0;">Add new elements into this section.</p>
+                            
+                            <div class="aipg-add-grid">
+                                <div class="aipg-add-item" data-block="heading">
+                                    <div class="aipg-add-icon">H</div>
+                                    <span>Heading</span>
+                                </div>
+                                <div class="aipg-add-item" data-block="paragraph">
+                                    <div class="aipg-add-icon">P</div>
+                                    <span>Text</span>
+                                </div>
+                                <div class="aipg-add-item" data-block="image">
+                                    <div class="aipg-add-icon">🖼️</div>
+                                    <span>Image</span>
+                                </div>
+                                <div class="aipg-add-item" data-block="button">
+                                    <div class="aipg-add-icon">🔘</div>
+                                    <span>Button</span>
+                                </div>
+                                <div class="aipg-add-item" data-block="spacer">
+                                    <div class="aipg-add-icon">↕️</div>
+                                    <span>Spacer</span>
+                                </div>
+                                <div class="aipg-add-item" data-block="logo">
+                                    <div class="aipg-add-icon">⭐</div>
+                                    <span>Logo</span>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 20px;">
+                                <label class="aipg-control-label">Insert Position</label>
+                                <div class="aipg-toggle-group">
+                                    <button class="aipg-mini-btn active" data-pos="below">Below Selection</button>
+                                    <button class="aipg-mini-btn" data-pos="above">Above Selection</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Manual Tweaks Tab -->
-                    <div class="aipg-tab-content" id="tab-manual-tweaks">
-                        <div class="aipg-control-group">
-                            <label class="aipg-control-label">Width Constraints</label>
-                            <select id="aipg-manual-width">
-                                <option value="constrained">Content Width (Constrained)</option>
-                                <option value="full">Full Width (Align: Full)</option>
-                            </select>
-                        </div>
-
-                        <div class="aipg-control-group">
-                            <label class="aipg-control-label">Padding Top (REM)</label>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="range" id="aipg-manual-pt-range" min="0" max="20" step="0.5" value="0">
-                                <span id="aipg-manual-pt-val" style="font-size:12px;color:#fff;width:30px;">0</span>
-                            </div>
-                        </div>
-
-                        <div class="aipg-control-group">
-                            <label class="aipg-control-label">Padding Bottom (REM)</label>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="range" id="aipg-manual-pb-range" min="0" max="20" step="0.5" value="0">
-                                <span id="aipg-manual-pb-val" style="font-size:12px;color:#fff;width:30px;">0</span>
-                            </div>
-                        </div>
-
-                        <div class="aipg-control-group">
-                            <label class="aipg-control-label">Background Color</label>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="color" id="aipg-manual-bg-color" value="#000000" style="width: 40px; padding: 0; cursor: pointer;">
-                                <button class="ws-btn-secondary" id="aipg-clear-bg-color" style="flex: 1; margin: 0; font-size: 12px; padding: 4px;">Clear Color</button>
-                            </div>
-                        </div>
-
-                        <div class="aipg-control-group" style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 11px; color: #888;">Auto-saves on change</span>
-                            <span id="aipg-manual-save-status" style="font-size: 12px; font-weight: bold; color: #aaa;"></span>
-                        </div>
+                    <div class="aipg-sidebar-footer">
+                        <div id="aipg-manual-save-status" style="font-size: 11px; color: #888; flex: 1;">Waiting for changes...</div>
+                        <button class="ws-btn-primary" id="aipg-manual-save-btn">Save Changes</button>
                     </div>
                 </div>
 
@@ -308,55 +378,110 @@
             $('#aipg-submit-edit').on('click', () => self.submitToAi());
             $('#aipg-close-error-modal').on('click', () => self.closeErrorModal());
 
-            // Manual Tweak Live Preview (Instant DOM Update)
-            $('#aipg-manual-pt-range').on('input', function () {
+            // Manual Style Live Preview
+            $('#aipg-manual-fs-range').on('input', function () {
                 const val = $(this).val();
-                $('#aipg-manual-pt-val').text(val);
-                if (self.$currentBlock) self.$currentBlock.css('padding-top', val + 'rem');
+                $('#aipg-manual-fs-num').val(val);
+                if (self.$currentBlock) self.$currentBlock.css('font-size', val + 'px');
+                self.markAsManualChanged();
             });
-            $('#aipg-manual-pb-range').on('input', function () {
+            $('#aipg-manual-fs-num').on('input', function () {
                 const val = $(this).val();
-                $('#aipg-manual-pb-val').text(val);
-                if (self.$currentBlock) self.$currentBlock.css('padding-bottom', val + 'rem');
+                $('#aipg-manual-fs-range').val(val);
+                if (self.$currentBlock) self.$currentBlock.css('font-size', val + 'px');
+                self.markAsManualChanged();
             });
+            $('#aipg-manual-text-color').on('input', function () {
+                const val = $(this).val();
+                if (self.$currentBlock) self.$currentBlock.css('color', val);
+                self.markAsManualChanged();
+            });
+
+            $('#aipg-manual-width').on('change', function () {
+                const val = $(this).val();
+                self.$currentBlock.removeClass('alignfull alignconstrained');
+                if (val) self.$currentBlock.addClass('align' + val);
+                self.markAsManualChanged();
+            });
+
+            $('#aipg-manual-img-width').on('input', function () {
+                const val = $(this).val();
+                const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
+                if ($img.length) {
+                    $img.css('max-width', val + '%');
+                }
+                self.markAsManualChanged();
+            });
+
+            $('#aipg-manual-pt, #aipg-manual-pb').on('input', function () {
+                const pt = $('#aipg-manual-pt').val();
+                const pb = $('#aipg-manual-pb').val();
+                if (self.$currentBlock) {
+                    if (pt) self.$currentBlock.css('padding-top', pt + 'rem');
+                    if (pb) self.$currentBlock.css('padding-bottom', pb + 'rem');
+                }
+                self.markAsManualChanged();
+            });
+
             $('#aipg-manual-bg-color').on('input', function () {
                 const val = $(this).val();
                 if (self.$currentBlock) self.$currentBlock.css('background-color', val);
+                self.markAsManualChanged();
             });
-            $('#aipg-manual-width').on('change', function () {
+
+            // Media tab handlers
+            $('#aipg-manual-img-width').on('input', function () {
                 const val = $(this).val();
-                if (self.$currentBlock) {
-                    if (val === 'full') {
-                        self.$currentBlock.addClass('alignfull');
-                        // Force nested Gutenberg inner containers to expand
-                        self.$currentBlock.find('.wp-block-group__inner-container').css('max-width', '100%');
-                    } else {
-                        self.$currentBlock.removeClass('alignfull');
-                        self.$currentBlock.find('.wp-block-group__inner-container').css('max-width', '');
-                    }
+                $('#aipg-img-width-val').text(val + '%');
+                const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
+                if ($img.length) {
+                    $img.css('max-width', val + '%');
                 }
+                self.markAsManualChanged();
             });
 
-            // Manual Tweak Database Save (Triggers on release of slider or exact selection)
-            $('#aipg-manual-width, #aipg-manual-pt-range, #aipg-manual-pb-range, #aipg-manual-bg-color').on('change', function () {
-                self.saveManualTweaks(false);
+            // Media Library Integration
+            $('#aipg-change-media-btn, #aipg-change-media').on('click', function (e) {
+                e.preventDefault();
+                if (typeof wp === 'undefined' || !wp.media) return;
+
+                const frame = wp.media({
+                    title: 'Select or Upload Media',
+                    button: { text: 'Use this media' },
+                    multiple: false
+                });
+
+                frame.on('select', function () {
+                    const attachment = frame.state().get('selection').first().toJSON();
+                    if (self.$currentBlock) {
+                        const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
+                        if ($img.length) {
+                            $img.attr('src', attachment.url);
+                            if (attachment.alt) $img.attr('alt', attachment.alt);
+                        }
+                    }
+                    self.markAsManualChanged();
+                });
+                frame.open();
             });
 
+            // Add Tab handlers
+            $('.aipg-add-item').on('click', function () {
+                const type = $(this).data('block');
+                self.insertNewBlock(type, 'below');
+            });
+
+            $('.aipg-mini-btn').on('click', function () {
+                $('.aipg-mini-btn').removeClass('active');
+                $(this).addClass('active');
+            });
+
+            // Save Buttons
+            $('#aipg-manual-save-btn').on('click', () => self.saveManualTweaks());
             $('#aipg-clear-bg-color').on('click', function () {
                 $('#aipg-manual-bg-color').val('#000000');
                 if (self.$currentBlock) self.$currentBlock.css('background-color', '');
-                self.saveManualTweaks(true); // Flag for clearing color
-            });
-
-            $('#aipg-copy-error-btn').on('click', function (e) {
-                e.stopPropagation();
-                const textToCopy = $('#aipg-error-diagnostics').text();
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                    const $btn = $(this);
-                    const originalText = $btn.text();
-                    $btn.text('Copied!');
-                    setTimeout(() => $btn.text(originalText), 2000);
-                });
+                self.markAsManualChanged();
             });
 
             $('.aipg-modal-backdrop').on('click', () => {
@@ -405,6 +530,9 @@
             $('#aipg-prompt-input').val('').focus();
             $('#aipg-submit-edit').text('Refine with AI').prop('disabled', false);
 
+            // Capture original state for lookup during database save
+            this.originalBlockMarkup = this.$currentBlock[0].outerHTML;
+
             // Populate manual tweak inputs with current block state
             this.syncManualInputsWithBlock();
         },
@@ -452,102 +580,148 @@
         },
 
         rgbToHex: function (rgb) {
-            if (!rgb || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent') return null;
-            let sep = rgb.indexOf(",") > -1 ? "," : " ";
-            rgb = rgb.substr(4).split(")")[0].split(sep);
-            let r = (+rgb[0]).toString(16), g = (+rgb[1]).toString(16), b = (+rgb[2]).toString(16);
-            if (r.length == 1) r = "0" + r;
-            if (g.length == 1) g = "0" + g;
-            if (b.length == 1) b = "0" + b;
+            if (!rgb || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'transparent' || rgb === 'initial') return '#000000';
+            const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (!match) return '#000000';
+            const r = parseInt(match[1]).toString(16).padStart(2, '0');
+            const g = parseInt(match[2]).toString(16).padStart(2, '0');
+            const b = parseInt(match[3]).toString(16).padStart(2, '0');
             return "#" + r + g + b;
+        },
+
+        markAsManualChanged: function () {
+            $('#aipg-manual-save-status').text('Changes pending...').css('color', '#e67e22');
+            $('#aipg-ai-polish-hint').fadeIn();
         },
 
         syncManualInputsWithBlock: function () {
             if (!this.$currentBlock) return;
-            const styles = this.getComputedStyles(this.$currentBlock);
+            const el = this.$currentBlock[0];
+            const styles = window.getComputedStyle(el);
 
-            // Width
-            if (this.$currentBlock.hasClass('alignfull')) {
-                $('#aipg-manual-width').val('full');
-            } else {
-                $('#aipg-manual-width').val('constrained');
-            }
+            // Background
+            $('#aipg-manual-bg-color').val(this.rgbToHex(styles.backgroundColor));
 
-            // Padding px to rem approximation
+            // Typography
+            const fs = parseInt(styles.fontSize);
+            $('#aipg-manual-fs-range').val(fs);
+            $('#aipg-manual-fs-num').val(fs);
+            $('#aipg-manual-text-color').val(this.rgbToHex(styles.color));
+
+            // Spacing
             const ptPx = parseFloat(styles.paddingTop) || 0;
             const pbPx = parseFloat(styles.paddingBottom) || 0;
-            const baseFontSize = 16;
+            $('#aipg-manual-pt').val((ptPx / 16).toFixed(1));
+            $('#aipg-manual-pb').val((pbPx / 16).toFixed(1));
 
-            const ptVal = (ptPx / baseFontSize).toFixed(1);
-            const pbVal = (pbPx / baseFontSize).toFixed(1);
+            // Width
+            if (this.$currentBlock.hasClass('alignfull')) $('#aipg-manual-width').val('full');
+            else if (this.$currentBlock.hasClass('alignconstrained')) $('#aipg-manual-width').val('constrained');
+            else $('#aipg-manual-width').val('');
 
-            $('#aipg-manual-pt-range').val(ptVal);
-            $('#aipg-manual-pt-val').text(ptVal);
-
-            $('#aipg-manual-pb-range').val(pbVal);
-            $('#aipg-manual-pb-val').text(pbVal);
-
-            // Background Color
-            const hexColor = this.rgbToHex(styles.backgroundColor);
-            if (hexColor) {
-                $('#aipg-manual-bg-color').val(hexColor);
+            // Media
+            const $img = this.$currentBlock.is('img') ? this.$currentBlock : this.$currentBlock.find('img').first();
+            if ($img.length) {
+                $('#aipg-image-controls').show();
+                const currentWidth = $img[0].style.maxWidth ? parseInt($img[0].style.maxWidth) : 100;
+                $('#aipg-manual-img-width').val(currentWidth);
             } else {
-                $('#aipg-manual-bg-color').val('#000000');
+                $('#aipg-image-controls').hide();
             }
+
+            $('#aipg-manual-save-status').text('Selection synced.').css('color', '#888');
+            $('#aipg-ai-polish-hint').hide();
         },
 
-        saveManualTweaks: function (clearColor = false, callback = null) {
+        saveManualTweaks: function (callback = null) {
             if (!this.$currentBlock) return;
+            const self = this;
             const $block = this.$currentBlock;
+            const $saveBtn = $('#aipg-manual-save-btn');
 
-            // Extract values
+            $saveBtn.text('Saving...').prop('disabled', true);
+            $('#aipg-manual-save-status').text('Writing to database...');
+
+            // Extract values for the backend to handle grammar nicely
             const width = $('#aipg-manual-width').val();
-            const pt = $('#aipg-manual-pt-range').val();
-            const pb = $('#aipg-manual-pb-range').val();
-            const bgColor = clearColor ? 'CLEAR' : $('#aipg-manual-bg-color').val();
+            const pt = $('#aipg-manual-pt').val();
+            const pb = $('#aipg-manual-pb').val();
+            const bgColor = $('#aipg-manual-bg-color').val();
+            const textColor = $('#aipg-manual-text-color').val();
+            const fontSize = $('#aipg-manual-fs-range').val();
+            const imgWidth = $('#aipg-manual-img-width').val(); // New: Image width
 
-            // Prepare markup target (strip temp tracking classes and temp CSS)
+            // Prepare markup (always grab fresh DOM)
             const $clone = $block.clone();
             $clone.removeClass('aipg-refining aipg-active-hover');
-            $clone.find('.aipg-refining, .aipg-active-hover').removeClass('aipg-refining aipg-active-hover');
 
-            // Revert temporary max-width hacks before serialization
-            $clone.find('.wp-block-group__inner-container').css('max-width', '');
-
-            const originalMarkup = $clone[0].outerHTML;
+            // Clean up temporary styles that shouldn't be in DB
+            const markup = $clone[0].outerHTML;
 
             const payload = {
                 action: 'aipg_studio_manual_edit',
                 nonce: aipg_editor_vars.nonce,
-                markup: originalMarkup,
+                markup: markup,
+                lookup_markup: self.originalBlockMarkup, // Use the state from before tweaks
                 post_id: parseInt(aipg_editor_vars.post_id, 10),
                 width: width,
                 padding_top: pt,
                 padding_bottom: pb,
-                bg_color: bgColor
+                bg_color: bgColor,
+                text_color: textColor,
+                font_size: fontSize,
+                img_width: imgWidth // New: Image width
             };
 
             $.ajax({
-                url: aipg_editor_vars.ajaxurl + '?action=aipg_studio_manual_edit',
+                url: aipg_editor_vars.ajaxurl,
                 type: 'POST',
                 data: payload,
                 success: function (res) {
-                    if (!res.success) {
-                        console.error('[AI Studio] Manual Tweak Save Failed:', res.data);
-                        alert("Error saving tweaks: " + res.data);
-                    } else {
-                        console.log('[AI Studio] Manual Tweak Saved Successfully.');
+                    $saveBtn.text('Save Changes').prop('disabled', false);
+                    if (res.success) {
+                        $('#aipg-manual-save-status').text('Saved!').css('color', '#27ae60');
+                        $('#aipg-ai-polish-hint').hide();
+                        setTimeout(() => $('#aipg-manual-save-status').text('All changes saved.').css('color', '#888'), 2000);
                         if (callback) callback();
+                    } else {
+                        self.showErrorModal('Manual Save Failed', res.data);
                     }
                 },
-                error: function (xhr, status, error) {
-                    console.error('[AI Studio] Server error during saving manual tweak:', error);
-                    alert("Server error connecting to backend.");
+                error: function () {
+                    $saveBtn.text('Save Changes').prop('disabled', false);
+                    self.showErrorModal('Connectivity error during manual save.');
                 }
             });
         },
 
+        insertNewBlock: function (type, position) {
+            if (!this.$currentBlock) return;
+            const self = this;
+
+            // Temporary insertion for visual feedback
+            let html = '';
+            switch (type) {
+                case 'heading': html = '<h2>New Heading</h2>'; break;
+                case 'paragraph': html = '<p>Write your content here...</p>'; break;
+                case 'button': html = '<div class="wp-block-button"><a class="wp-block-button__link wp-element-button">Click Me</a></div>'; break;
+                case 'image': html = '<figure class="wp-block-image size-full"><img src="https://via.placeholder.com/800x400" alt="Placeholder"></figure>'; break;
+                case 'logo': html = '<div class="wp-block-site-logo"><a class="custom-logo-link"><img src="https://via.placeholder.com/150" style="max-width:150px;" alt="Logo"></a></div>'; break;
+                case 'spacer': html = '<div style="height:50px" class="wp-block-spacer"></div>'; break;
+            }
+
+            if (position === 'above') {
+                this.$currentBlock.before(html);
+            } else {
+                this.$currentBlock.after(html);
+            }
+
+            // We trigger a "manual save" of the WHOLE CONTAINER to ensure the new block is in the DB
+            this.markAsManualChanged();
+        },
+
         getComputedStyles: function ($el) {
+            if (!$el || !$el.length) return {};
             const el = $el[0];
             const styles = window.getComputedStyle(el);
             return {
@@ -578,6 +752,15 @@
             let $target = $block;
             let $targetContainer = $block;
             let isDived = false;
+
+            // ATOMIC REFINEMENT: If we are inside a template part (header/footer),
+            // we should refine the ENTIRE template part as one atomic unit to prevent nesting issues.
+            const $tpContainer = $block.closest('[class*="aipg-part-"]');
+            if ($tpContainer.length) {
+                console.log('[AI Studio] Atomic Mode: Detected Template Part parent. Switching target to:', $tpContainer.prop('tagName'));
+                $target = $tpContainer;
+                $targetContainer = $tpContainer;
+            }
 
             // Check if we selected a theme wrapper or something containing theme-level elements
             const containsContentArea = $block.find('.entry-content, .wp-block-post-content').length > 0;
@@ -688,13 +871,21 @@
 
                             if (response.data.is_template_part) {
                                 // The backend updated an entire template part (like Header/Footer).
-                                // Replace the closest template part container rather than the specific block hovered.
-                                let $tpContainer = $block.closest('header, footer, [class*="wp-block-template-part"]');
+                                // Try to find the closest template part container by our internal class first, then semantic tags.
+                                let $tpContainer = $block.closest('[class*="aipg-part-"], header, footer, [class*="wp-block-template-part"]');
+
                                 if ($tpContainer.length) {
-                                    console.log('[AI Studio] Replacer: Replacing Template Part Container', { old: $tpContainer[0].outerHTML, new: $newElement[0].outerHTML });
+                                    console.log('[AI Studio] Replacer: Replacing Template Part Container', {
+                                        selector: $tpContainer.prop("tagName"),
+                                        oldSize: $tpContainer[0].outerHTML.length,
+                                        newSize: $newElement[0].outerHTML.length
+                                    });
                                     $tpContainer.replaceWith($newElement);
                                 } else {
-                                    console.log('[AI Studio] Replacer: Replacing Template Part Block', { old: $block[0].outerHTML, new: $newElement[0].outerHTML });
+                                    console.log('[AI Studio] Replacer: Replacing Template Part Block (Fallback)', {
+                                        oldSize: $block[0].outerHTML.length,
+                                        newSize: $newElement[0].outerHTML.length
+                                    });
                                     $block.replaceWith($newElement);
                                 }
                             } else if (isDived) {

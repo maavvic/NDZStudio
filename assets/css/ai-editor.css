@@ -155,58 +155,108 @@
     transition: transform 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
-.aipg-editor-modal.aipg-sidebar-open {
-    transform: translateX(0);
+.aipg-sidebar-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
 }
 
-.aipg-sidebar-header {
-    padding: 20px;
+.aipg-control-divider {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #e67e22;
+    margin: 25px 0 15px 0;
+    padding-bottom: 5px;
     border-bottom: 1px solid #333;
+    font-weight: 700;
+}
+
+.aipg-add-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.aipg-add-item {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 15px 10px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.aipg-editor-modal h3 {
-    margin: 0;
-    color: #fff;
-    font-size: 16px;
-    font-weight: 600;
+.aipg-add-item:hover {
+    border-color: #e67e22;
+    background: #333;
+    transform: translateY(-2px);
 }
 
-/* Tabs */
-.aipg-sidebar-tabs {
+.aipg-add-icon {
+    font-size: 20px;
+    width: 40px;
+    height: 40px;
     display: flex;
-    border-bottom: 1px solid #333;
+    align-items: center;
+    justify-content: center;
+    background: #1e1e1e;
+    border-radius: 50%;
+    color: #e67e22;
 }
 
-.aipg-tab-btn {
+.aipg-add-item span {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.aipg-toggle-group {
+    display: flex;
+    background: #2a2a2a;
+    padding: 4px;
+    border-radius: 8px;
+    gap: 4px;
+}
+
+.aipg-mini-btn {
     flex: 1;
     background: transparent;
     border: none;
     color: #888;
-    padding: 12px 0;
+    font-size: 11px;
+    padding: 6px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: color 0.2s;
-    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
 }
 
-.aipg-tab-btn.active {
-    color: #e67e22;
-    border-bottom-color: #e67e22;
+.aipg-mini-btn.active {
+    background: #e67e22;
+    color: white;
 }
 
-.aipg-tab-content {
-    display: none;
-    padding: 20px;
-    flex: 1;
-    overflow-y: auto;
+.aipg-logo-sparkle {
+    font-size: 18px;
+    animation: aipgSparkle 2s infinite ease-in-out;
 }
 
-.aipg-tab-content.active {
-    display: block;
+@keyframes aipgSparkle {
+
+    0%,
+    100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0px #e67e22);
+    }
+
+    50% {
+        transform: scale(1.2);
+        filter: drop-shadow(0 0 5px #e67e22);
+    }
 }
 
 /* Form Elements */
