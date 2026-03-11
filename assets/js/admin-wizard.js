@@ -21,8 +21,39 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 variation: []
             },
             template: null,
-            error: null
+            error: null,
+            industryName: '',
+            styleName: ''
         },
+
+        industries: [
+            { id: 'business', title: 'Business / Company', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 21h18M3 7v14M21 7v14M9 21V10l3-3 3 3v11m-6-3h6"/></svg>' },
+            { id: 'ecommerce', title: 'Online Store', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' },
+            { id: 'portfolio', title: 'Portfolio / Creator', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' },
+            { id: 'blog', title: 'Blog / Magazine', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
+            { id: 'restaurant', title: 'Food & Drink', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>' },
+            { id: 'realestate', title: 'Real Estate', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' },
+            { id: 'health', title: 'Health & Wellness', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>' },
+            { id: 'education', title: 'Education / Course', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>' },
+            { id: 'agency', title: 'Agency / Consulting', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>' },
+            { id: 'local', title: 'Local Service', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>' },
+            { id: 'charity', title: 'Charity / NGO', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z"/><path d="M12 5.5s.5-3 3-3c2 0 3.5 1.5 3.5 3.5 0 2.5-3.5 6.5-6.5 9.5-3-3-6.5-7-6.5-9.5 0-2 1.5-3.5 3.5-3.5 2.5 0 3 3 3 3z"/></svg>' },
+            { id: 'saas', title: 'Tech / SaaS', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>' }
+        ],
+        styles: [
+            { id: 'minimal', title: 'Minimalist', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>' },
+            { id: 'modern', title: 'Modern', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4.43a1.67 1.67 0 0 1 2.4 0L9 8z"></path><path d="M12 15v5s3.03-.55 4.43-2.03a1.67 1.67 0 0 0 0-2.43L16 15z"></path></svg>' },
+            { id: 'classic', title: 'Classic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
+            { id: 'bold', title: 'Bold & Vibrant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
+            { id: 'luxury', title: 'Luxury & Elegant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>' },
+            { id: 'tech', title: 'Tech & Futuristic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' },
+            { id: 'organic', title: 'Organic & Natural', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8a8 8 0 0 1-10 10z"></path></svg>' },
+            { id: 'brutalist', title: 'Brutalist Raw', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>' },
+            { id: 'retro', title: 'Retro / Vintage', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M12 8l-4 4 4 4M16 12H8"></path></svg>' },
+            { id: 'industrial', title: 'Industrial / Loft', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M3 9h18M9 21V9"></path></svg>' },
+            { id: 'playful', title: 'Playful & Fun', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>' },
+            { id: 'dark', title: 'Dark / Night', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' }
+        ],
 
         steps: [
             {
@@ -81,24 +112,11 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 title: 'Defining the Essence',
                 subtitle: 'Choose the medium that best describes your digital presence.',
                 render: function () {
-                    const industries = [
-                        { id: 'business', title: 'Business / Company', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 21h18M3 7v14M21 7v14M9 21V10l3-3 3 3v11m-6-3h6"/></svg>' },
-                        { id: 'ecommerce', title: 'Online Store', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>' },
-                        { id: 'portfolio', title: 'Portfolio / Creator', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>' },
-                        { id: 'blog', title: 'Blog / Magazine', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
-                        { id: 'restaurant', title: 'Food & Drink', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>' },
-                        { id: 'realestate', title: 'Real Estate', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' },
-                        { id: 'health', title: 'Health & Wellness', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>' },
-                        { id: 'education', title: 'Education / Course', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>' },
-                        { id: 'agency', title: 'Agency / Consulting', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>' },
-                        { id: 'local', title: 'Local Service', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>' },
-                        { id: 'charity', title: 'Charity / NGO', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z"/><path d="M12 5.5s.5-3 3-3c2 0 3.5 1.5 3.5 3.5 0 2.5-3.5 6.5-6.5 9.5-3-3-6.5-7-6.5-9.5 0-2 1.5-3.5 3.5-3.5 2.5 0 3 3 3 3z"/></svg>' },
-                        { id: 'saas', title: 'Tech / SaaS', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>' }
-                    ];
+                    const industries = WPStudioWizard.industries;
                     return `
                         <div class="ws-option-grid">
                             ${industries.map(ind => `
-                                <div class="ws-option-card ${WPStudioWizard.data.industry === ind.id ? 'active' : ''}" data-id="${ind.id}">
+                                <div class="ws-option-card ${WPStudioWizard.data.industry === ind.id ? 'active' : ''}" data-id="${ind.id}" data-title="${ind.title}">
                                     <div class="ws-option-icon">${ind.icon}</div>
                                     <div class="ws-option-title">${ind.title}</div>
                                 </div>
@@ -133,24 +151,11 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 title: 'The Visual Signature',
                 subtitle: 'Select an aesthetic soul for your brand.',
                 render: function () {
-                    const styles = [
-                        { id: 'minimal', title: 'Minimalist', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>' },
-                        { id: 'modern', title: 'Modern', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-4.43a1.67 1.67 0 0 1 2.4 0L9 8z"></path><path d="M12 15v5s3.03-.55 4.43-2.03a1.67 1.67 0 0 0 0-2.43L16 15z"></path></svg>' },
-                        { id: 'classic', title: 'Classic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>' },
-                        { id: 'bold', title: 'Bold & Vibrant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
-                        { id: 'luxury', title: 'Luxury & Elegant', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>' },
-                        { id: 'tech', title: 'Tech & Futuristic', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>' },
-                        { id: 'organic', title: 'Organic & Natural', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8a8 8 0 0 1-10 10z"></path></svg>' },
-                        { id: 'brutalist', title: 'Brutalist Raw', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>' },
-                        { id: 'retro', title: 'Retro / Vintage', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M12 8l-4 4 4 4M16 12H8"></path></svg>' },
-                        { id: 'industrial', title: 'Industrial / Loft', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M3 9h18M9 21V9"></path></svg>' },
-                        { id: 'playful', title: 'Playful & Fun', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>' },
-                        { id: 'dark', title: 'Dark / Night', icon: '<svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' }
-                    ];
+                    const styles = WPStudioWizard.styles;
                     return `
                         <div class="ws-option-grid">
                             ${styles.map(s => `
-                                <div class="ws-option-card ${WPStudioWizard.data.style === s.id ? 'active' : ''}" data-id="${s.id}">
+                                <div class="ws-option-card ${WPStudioWizard.data.style === s.id ? 'active' : ''}" data-id="${s.id}" data-title="${s.title}">
                                     <div class="ws-option-icon">${s.icon}</div>
                                     <div class="ws-option-title">${s.title}</div>
                                 </div>
@@ -553,11 +558,18 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
 
             $(document).on('click', '.ws-option-card', function () {
                 const id = $(this).data('id');
+                const title = $(this).data('title') || '';
                 const step = self.steps[self.currentStep];
 
                 if (self.currentStep === 0) self.data.themeStrategy = id;
-                if (self.currentStep === 2) self.data.industry = id;
-                if (self.currentStep === 4) self.data.style = id;
+                if (self.currentStep === 2) {
+                    self.data.industry = id;
+                    self.data.industryName = title;
+                }
+                if (self.currentStep === 4) {
+                    self.data.style = id;
+                    self.data.styleName = title;
+                }
 
                 $('.ws-option-card').removeClass('active');
                 $(this).addClass('active');
@@ -974,7 +986,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
             const payload = {
                 site_name: self.data.siteName,
                 industry: self.data.industry,
+                industry_name: self.data.industryName,
                 style: self.data.style,
+                style_name: self.data.styleName,
                 brief: self.data.brief,
                 palette: self.data.palette.variation,
                 model_tier: localStorage.getItem('aipg_model_tier') || 'claude_haiku'
@@ -1081,6 +1095,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 template_name: template.name,
                 prototype_prompt: template.prototype_prompt,
+                site_name: self.data.siteName,
+                industry_name: self.data.industryName,
+                style_name: self.data.styleName,
+                brief: self.data.brief,
                 palette: self.data.palette.variation,
                 model_tier: localStorage.getItem('aipg_model_tier') || 'claude_sonnet'
             };
@@ -1147,7 +1165,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             $status.find('.ws-progress-fill').css('width', '100%');
                             $status.find('.ws-status-text').text('Installing the prototype...');
                             if (sData.response) {
-                                self.installPrototype(sData.response, templateName, $card, templateRecordId);
+                                // Standardize layout_id for isolation (jobId is a solid fallback)
+                                const isolationId = sData.layout_id || jobId;
+                                self.installPrototype(sData.response, templateName, $card, isolationId);
                             } else {
                                 alert("AI completed successfully but no payload was returned.");
                             }
@@ -1201,7 +1221,7 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 nonce: (typeof aipg_wizard_data !== 'undefined') ? aipg_wizard_data.nonce : '',
                 code: code,
                 template_name: name,
-                project_id: project_id,
+                layout_id: project_id, // Standardized key for backend
                 theme_strategy: self.data.themeStrategy
             }, function (res) {
                 if (res.success) {
@@ -1212,8 +1232,14 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     `);
                     $card.find('.ws-btn-preview').hide();
                 } else {
-                    alert('Installation failed: ' + res.data);
+                    const err = res.data || 'Unknown error during installation.';
+                    alert('Installation failed: ' + err);
+                    $status.find('.ws-status-text').text('Installation Failed');
                 }
+            }).fail(function (jqXHR, textStatus) {
+                console.error('[Wizard] Installation AJAX Failed:', textStatus);
+                $status.find('.ws-status-text').text('Server Hang / Error');
+                alert('The server took too long to install the prototype. Please check your "My Projects" list in a moment to see if it completed in the background.');
             });
         },
 

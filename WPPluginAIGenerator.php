@@ -1660,6 +1660,10 @@ function aipg_ajax_generate_studio_prototype() {
 
     $template_name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : '';
     $prototype_prompt = isset( $_POST['prototype_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prototype_prompt'] ) ) : '';
+    $site_name = isset( $_POST['site_name'] ) ? sanitize_text_field( wp_unslash( $_POST['site_name'] ) ) : '';
+    $industry_name = isset( $_POST['industry_name'] ) ? sanitize_text_field( wp_unslash( $_POST['industry_name'] ) ) : '';
+    $style_name = isset( $_POST['style_name'] ) ? sanitize_text_field( wp_unslash( $_POST['style_name'] ) ) : '';
+    $brief = isset( $_POST['brief'] ) ? sanitize_textarea_field( wp_unslash( $_POST['brief'] ) ) : '';
     $palette = isset( $_POST['palette'] ) ? (array) $_POST['palette'] : [];
     $model_tier = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'claude_sonnet';
 
@@ -1673,6 +1677,10 @@ function aipg_ajax_generate_studio_prototype() {
         'body'        => wp_json_encode([
             'template_name' => $template_name,
             'prototype_prompt' => $prototype_prompt,
+            'site_name' => $site_name,
+            'industry_name' => $industry_name,
+            'style_name' => $style_name,
+            'brief' => $brief,
             'palette' => $palette,
             'model_tier' => $model_tier
         ]),
@@ -1767,6 +1775,9 @@ function aipg_ajax_install_prototype() {
     check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
     if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
+    // Increase time limit for the heavy installation process (FSE operations, multiple pages)
+    set_time_limit( 300 ); 
+
     $raw_response = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $layout_id    = isset( $_POST['layout_id'] ) ? sanitize_text_field( wp_unslash( $_POST['layout_id'] ) ) : '';
     $project_id   = $layout_id; // Normalize for internal use
@@ -1774,6 +1785,7 @@ function aipg_ajax_install_prototype() {
     $data = json_decode( $raw_response, true );
 
     if ( ! $data || ! isset( $data['pages'] ) ) {
+        error_log("[AI Studio] Installation failed: Invalid or empty data received. Length: " . strlen($raw_response));
         wp_send_json_error( 'Invalid Gutenberg data received.' );
     }
 
