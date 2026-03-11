@@ -771,8 +771,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                     const status = res.data.status;
                     const tokens = res.data.completion_tokens || 0;
 
-                    // Use 20,000 tokens as the baseline for 100% of a full layout archetype
-                    const pct = Math.min(99, Math.round((res.data.completion_tokens / 40000) * 100));
+                    // Use 15,000 tokens as the baseline for 100% of a layout archetype
+                    const pct = Math.min(99, Math.round((res.data.completion_tokens / 15000) * 100));
 
                     if (status === 'COMPLETED') {
                         $('#ws-finish-progress-fill').css('width', '100%');
@@ -1183,8 +1183,8 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             const isStalled = updatedAt && (now - updatedAt > 60000); // 1 minute without update
 
                             if (tokens > 0) {
-                                // Calculate actual percentage based on ~40,000 token estimate for a 6-page site
-                                let pct = Math.floor((tokens / 40000) * 100);
+                                // Calculate actual percentage based on ~15,000 token estimate
+                                let pct = Math.floor((tokens / 15000) * 100);
                                 if (pct > 99) pct = 99;
 
                                 // Ensure progress never goes backward
