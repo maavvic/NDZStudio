@@ -768,9 +768,10 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 job_id: jobId
             }, function (res) {
                 if (res.success) {
+                    const status = res.data.status;
                     const tokens = res.data.completion_tokens || 0;
 
-                    // Tiered Baseline: Start with 10k, shift to 15k if AI is "wordy"
+                    // Tiered Baseline: Align with the 13k-15k actual outputs
                     let baseline = (tokens > 10000) ? 15000 : 10000;
                     let pct = Math.round((tokens / baseline) * 100);
 

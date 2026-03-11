@@ -74,3 +74,30 @@ body.wp-embed-responsive .wp-site-blocks>* {
 .wp-block-columns * {
     box-sizing: border-box !important;
 }
+
+/* 7. Navigation Active State (ULTRA AGGRESSIVE) */
+.wp-block-navigation .wp-block-navigation-item.current-menu-item>a,
+.wp-block-navigation .wp-block-navigation-item.current-menu-item>.wp-block-navigation-item__content,
+.wp-block-navigation .wp-block-navigation-item.is-current>a,
+.wp-block-navigation .wp-block-navigation-item.is-current>.wp-block-navigation-item__content,
+.wp-block-navigation .active,
+.wp-block-navigation .current-page,
+.nav-link.active,
+.nav-link.current-page,
+a.active,
+a.current-page {
+    opacity: 1 !important;
+    font-weight: 900 !important;
+    text-decoration: underline !important;
+    text-underline-offset: 8px !important;
+    text-decoration-thickness: 3px !important;
+    text-decoration-color: currentColor !important;
+}
+
+/* Ensure the label inside the link also inherits the heavy weight */
+.active .wp-block-navigation-item__label,
+.current-page .wp-block-navigation-item__label,
+.current-menu-item .wp-block-navigation-item__label,
+.is-current .wp-block-navigation-item__label {
+    font-weight: 900 !important;
+}

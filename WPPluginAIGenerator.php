@@ -173,6 +173,46 @@ function aipg_load_global_normalize() {
         // Use time() as version for aggressive cache busting
         wp_enqueue_style( 'aipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], time() );
     }
+    
+    // Add Active Link Highlighter for all users on AI pages
+    add_action('wp_footer', 'aipg_render_active_link_highlighter', 999);
+}
+
+/**
+ * Renders the JS helper to highlight the currently active menu item.
+ */
+function aipg_render_active_link_highlighter() {
+    ?>
+    <script id="aipg-active-link-highlighter">
+    (function() {
+        const currentUrl = new URL(window.location.href);
+        const currentPath = currentUrl.pathname.replace(/\/$/, "");
+        
+        const links = document.querySelectorAll('.aipg-part-header a, .wp-block-navigation-link a, .wp-block-navigation-item a');
+        links.forEach(link => {
+            try {
+                const linkUrl = new URL(link.href, window.location.origin);
+                const linkPath = linkUrl.pathname.replace(/\/$/, "");
+                
+                if (currentPath === linkPath || (linkPath !== "" && currentPath.startsWith(linkPath + '/'))) {
+                    link.classList.add('active');
+                    link.classList.add('current-page');
+                    
+                    // Highlight parent items for Gutenberg/Theme menus
+                    let parent = link.parentElement;
+                    while (parent && !parent.classList.contains('aipg-part-header')) {
+                        if (parent.classList.contains('wp-block-navigation-item')) {
+                            parent.classList.add('current-menu-item');
+                            parent.classList.add('is-current');
+                        }
+                        parent = parent.parentElement;
+                    }
+                }
+            } catch (e) {}
+        });
+    })();
+    </script>
+    <?php
 }
 
 /**
@@ -196,7 +236,6 @@ function aipg_enqueue_studio_editor() {
         'wizard_url' => admin_url( 'admin.php?page=nodevzone' )
     ]);
 
-    // Diagnostic log in footer for admin
     add_action('wp_footer', function() {
         echo '<!-- AI Studio Editor Active -->';
     }, 999);
@@ -241,8 +280,22 @@ function aipg_inject_studio_custom_styles() {
     $css .= "  font-family: inherit !important; \n";
     $css .= "} \n";
 
-    // Also inject a helper to ensure blocks use these colors if the theme is stubborn
+    // AI Page Base Aesthetics
     $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); } \n";
+    $css .= ".wp-block-navigation .wp-block-navigation-item > a { opacity: 0.8; transition: opacity 0.3s; } \n";
+
+    // SUBTLE FALLBACK: Only used if AI doesn't provide its own .active style
+    $css .= "
+    .wp-block-navigation .wp-block-navigation-item.current-menu-item > a,
+    .wp-block-navigation .wp-block-navigation-item.is-current > a,
+    .wp-block-navigation .active,
+    .wp-block-navigation .current-page {
+        opacity: 1 !important;
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 6px;
+    }
+    ";
 
     echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
 
@@ -1737,7 +1790,7 @@ function aipg_ajax_check_studio_generation_status() {
     }
 
     $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
-    $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $job_id;
+    $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $job_id . '?t=' . time();
 
     $response = wp_remote_get( $endpoint, [
         'timeout' => 60,
