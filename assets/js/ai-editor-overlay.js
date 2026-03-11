@@ -29,6 +29,17 @@
             this.$overlay = $('<div class="aipg-block-overlay"></div>').appendTo('body');
             this.$label = $('<div class="aipg-block-label">✨ <span>Edit with AI</span></div>').appendTo(this.$overlay);
 
+            // Add Omni-directional Insert Nodes
+            const dirs = ['top', 'bottom', 'left', 'right'];
+            dirs.forEach(dir => {
+                this.$overlay.append(`
+                    <div class="aipg-omni-node aipg-omni-${dir}">
+                        <button class="aipg-omni-btn aipg-omni-dup" data-dir="${dir}" title="Duplicate element here">+</button>
+                        <button class="aipg-omni-btn aipg-omni-ai" data-dir="${dir}" title="Generate new element with AI">✨</button>
+                    </div>
+                `);
+            });
+
             this.$modal = $(`
                 <div class="aipg-modal-backdrop"></div>
                 
@@ -44,7 +55,7 @@
 
                     <div class="aipg-sidebar-tabs">
                         <button class="aipg-tab-btn active" data-tab="ai-prompt">AI Magic</button>
-                        <button class="aipg-tab-btn" data-tab="manual-style">Styles</button>
+                        <button class="aipg-tab-btn" data-tab="manual-style">Modify</button>
                         <button class="aipg-tab-btn" data-tab="add-blocks">Add</button>
                     </div>
 
@@ -93,20 +104,80 @@
                             <div class="aipg-control-divider">Layout & Spacing</div>
 
                             <div class="aipg-control-group">
-                                <label class="aipg-control-label">Padding (Top/Bottom)</label>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                    <input type="number" id="aipg-manual-pt" placeholder="Top" title="Padding Top (REM)">
-                                    <input type="number" id="aipg-manual-pb" placeholder="Bottom" title="Padding Bottom (REM)">
-                                </div>
-                            </div>
-
-                            <div class="aipg-control-group">
                                 <label class="aipg-control-label">Width Constraints</label>
                                 <select id="aipg-manual-width">
                                     <option value="">Default (From Theme)</option>
                                     <option value="constrained">Content Width</option>
                                     <option value="full">Full Width</option>
                                 </select>
+                            </div>
+
+                            <div class="aipg-control-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <label class="aipg-control-label" style="margin: 0;">Margin</label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <select id="aipg-margin-unit" class="aipg-unit-select" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #ccc; border: 1px solid rgba(255,255,255,0.1);">
+                                            <option value="px">px</option>
+                                            <option value="em">em</option>
+                                            <option value="rem" selected>rem</option>
+                                            <option value="%">%</option>
+                                        </select>
+                                        <button class="aipg-link-btn active" id="aipg-link-margin" title="Link values together">🔗</button>
+                                    </div>
+                                </div>
+                                <input type="range" id="aipg-slider-margin" min="0" max="10" step="0.1" value="0" style="margin-top: 0;">
+                                <div class="aipg-spacing-grid aipg-4way">
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-mt" step="0.1" placeholder="0">
+                                        <span>Top</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-mr" step="0.1" placeholder="0">
+                                        <span>Right</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-mb" step="0.1" placeholder="0">
+                                        <span>Bottom</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-ml" step="0.1" placeholder="0">
+                                        <span>Left</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="aipg-control-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <label class="aipg-control-label" style="margin: 0;">Padding</label>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <select id="aipg-padding-unit" class="aipg-unit-select" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #ccc; border: 1px solid rgba(255,255,255,0.1);">
+                                            <option value="px">px</option>
+                                            <option value="em">em</option>
+                                            <option value="rem" selected>rem</option>
+                                            <option value="%">%</option>
+                                        </select>
+                                        <button class="aipg-link-btn active" id="aipg-link-padding" title="Link values together">🔗</button>
+                                    </div>
+                                </div>
+                                <input type="range" id="aipg-slider-padding" min="0" max="10" step="0.1" value="0" style="margin-top: 0;">
+                                <div class="aipg-spacing-grid aipg-4way">
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-pt" step="0.1" placeholder="0">
+                                        <span>Top</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-pr" step="0.1" placeholder="0">
+                                        <span>Right</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-pb" step="0.1" placeholder="0">
+                                        <span>Bottom</span>
+                                    </div>
+                                    <div class="aipg-spacing-field">
+                                        <input type="number" id="aipg-manual-pl" step="0.1" placeholder="0">
+                                        <span>Left</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="aipg-media-section" id="aipg-image-controls" style="margin-top: 15px; background: #2a2a2a; padding: 12px; border-radius: 8px; border: 1px dashed #444;">
@@ -165,15 +236,32 @@
                 </div>
 
                 <!-- Error Diagnostics Modal -->
-                <div class="aipg-editor-modal" id="aipg-error-modal" style="width: 600px; max-width: 95%;">
-                    <h3 style="color: #e74c3c;">AI Refinement Error</h3>
+                <div id="aipg-error-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px; max-width: 95%; background: var(--aipg-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--aipg-glass-border); border-radius: 12px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); z-index: 10000002; color: var(--aipg-text);">
+                    <h3 style="color: #ef4444; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        AI Refinement Error
+                    </h3>
                     <p id="aipg-error-message" style="font-size: 14px; font-weight: 500; margin-bottom: 10px;"></p>
-                    <div class="aipg-diagnostics-container" style="background: #1e1e1e; color: #a6e22e; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; height: 250px; overflow-y: auto; text-align: left; margin-bottom: 15px; display: none;">
+                    <div class="aipg-diagnostics-container" style="background: rgba(0,0,0,0.6); color: #4ade80; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px; height: 250px; overflow-y: auto; text-align: left; margin-bottom: 15px; display: none;">
                         <pre id="aipg-error-diagnostics" style="margin: 0; white-space: pre-wrap; word-wrap: break-word;"></pre>
                     </div>
                     <div style="text-align: right; display: flex; justify-content: space-between; align-items: center;">
-                        <button class="ws-btn-secondary" id="aipg-copy-error-btn" style="display: none; font-size: 12px; padding: 6px 12px;">Copy Log</button>
-                        <button class="ws-btn-primary" id="aipg-close-error-modal">Close</button>
+                        <button class="ws-btn-secondary" id="aipg-copy-error-btn" style="display: none; font-size: 12px; padding: 6px 12px; background: rgba(255,255,255,0.1); border: none; color: white;">Copy Log</button>
+                        <button class="ws-btn-primary" id="aipg-close-error-modal" style="background: var(--aipg-accent); border: none; padding: 8px 16px; border-radius: 6px; color: white;">Close</button>
+                    </div>
+                </div>
+
+                <!-- Custom Prompt Modal for AI Insertion -->
+                <div id="aipg-omni-prompt-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; max-width: 95%; background: var(--aipg-glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--aipg-accent); border-radius: 12px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 10000002; color: var(--aipg-text);">
+                    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+                        <span style="color: var(--aipg-accent);">✨</span> Generate New Element
+                    </h3>
+                    <p style="font-size: 13px; color: var(--aipg-text-dim); margin-bottom: 16px;">Describe what kind of element you would like to generate in this position. The AI will match the parent's styling.</p>
+                    <textarea id="aipg-omni-prompt-input" rows="3" placeholder="e.g. 'A blue call to action button saying Hello'" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; color: white; font-family: inherit; resize: vertical; margin-bottom: 16px; outline: none;"></textarea>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button class="ws-btn-secondary" id="aipg-omni-prompt-cancel" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer;">Cancel</button>
+                        <button class="ws-btn-primary" id="aipg-omni-prompt-submit" style="background: var(--aipg-accent); border: none; padding: 8px 16px; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">Generate Element</button>
                     </div>
                 </div>
             `).appendTo('body');
@@ -227,6 +315,12 @@
                 // Protect against hovering over our own modals/UI
                 if ($el.closest('.aipg-editor-modal, .aipg-mode-toggle, .aipg-block-overlay').length > 0) return;
 
+                // Prevent flicker: if we are already highlighting THIS exact block, do nothing.
+                if (self.$currentBlock && self.$currentBlock[0] === $el[0] && self.$overlay.is(':visible')) {
+                    e.stopPropagation();
+                    return;
+                }
+
                 // Stop propagation so we pick the innermost block when hovering specifically,
                 // BUT we allow the user to reach outer blocks if they hover on their edges.
                 e.stopPropagation();
@@ -266,10 +360,34 @@
                 }
             });
 
-            $(document).on('mouseleave', targetSelectors, function () {
+            $(document).on('mouseleave', targetSelectors, function (e) {
                 if (!self.aiEnabled || self.isEditing) return;
+
+                // Prevent flicker: if we are moving from the block into the overlay's buttons, don't hide
+                if (e.relatedTarget && $(e.relatedTarget).closest('.aipg-block-overlay').length) {
+                    return;
+                }
+
                 self.$overlay.hide().removeClass('aipg-active');
 
+                if (self.outlinesEnabled) {
+                    $('.aipg-outline-box').remove();
+                }
+            });
+
+            // When the mouse leaves the overlay buttons (which have pointer-events auto)
+            $(document).on('mouseleave', '.aipg-block-overlay', function (e) {
+                if (!self.aiEnabled || self.isEditing) return;
+
+                // Did we move back to the currently highlighted block?
+                if (self.$currentBlock && e.relatedTarget) {
+                    // Check if relatedTarget is the current block or a child of it
+                    if ($(e.relatedTarget).closest(self.$currentBlock).length) {
+                        return; // We moved back to the main block, keep overlay active
+                    }
+                }
+
+                self.$overlay.hide().removeClass('aipg-active');
                 if (self.outlinesEnabled) {
                     $('.aipg-outline-box').remove();
                 }
@@ -278,6 +396,9 @@
             // Click detection via coordinates (to avoid flickering from pointer-events: auto)
             $(document).on('mousedown', function (e) {
                 if (!self.aiEnabled || self.isEditing || !self.$overlay.is(':visible')) return;
+
+                // Ignore clicks on omni buttons
+                if ($(e.target).closest('.aipg-omni-node').length) return;
 
                 const o = self.$overlay.offset();
                 const w = self.$overlay.outerWidth();
@@ -366,11 +487,19 @@
 
             // Tab Switching functionality
             $('.aipg-sidebar-tabs .aipg-tab-btn').on('click', function () {
+                const tab = $(this).data('tab');
                 $('.aipg-sidebar-tabs .aipg-tab-btn').removeClass('active');
                 $(this).addClass('active');
 
                 $('.aipg-tab-content').removeClass('active');
-                $('#tab-' + $(this).data('tab')).addClass('active');
+                $('#tab-' + tab).addClass('active');
+
+                // Hide backdrop if in style tab for unobstructed view
+                if (tab === 'manual-style') {
+                    $('.aipg-modal-backdrop').fadeOut(200);
+                } else {
+                    $('.aipg-modal-backdrop').fadeIn(200);
+                }
             });
 
             // Modal Actions
@@ -379,101 +508,193 @@
             $('#aipg-close-error-modal').on('click', () => self.closeErrorModal());
 
             // Manual Style Live Preview
-            $('#aipg-manual-fs-range').on('input', function () {
-                const val = $(this).val();
-                $('#aipg-manual-fs-num').val(val);
-                if (self.$currentBlock) self.$currentBlock.css('font-size', val + 'px');
+            $('#aipg-manual-bg-color').on('input', function () {
+                if (self.$currentBlock) self.$currentBlock.css('background-color', $(this).val());
                 self.markAsManualChanged();
             });
-            $('#aipg-manual-fs-num').on('input', function () {
-                const val = $(this).val();
-                $('#aipg-manual-fs-range').val(val);
-                if (self.$currentBlock) self.$currentBlock.css('font-size', val + 'px');
-                self.markAsManualChanged();
-            });
+
             $('#aipg-manual-text-color').on('input', function () {
-                const val = $(this).val();
-                if (self.$currentBlock) self.$currentBlock.css('color', val);
+                if (self.$currentBlock) self.$currentBlock.css('color', $(this).val());
                 self.markAsManualChanged();
             });
 
-            $('#aipg-manual-width').on('change', function () {
+            $('#aipg-manual-fs-range, #aipg-manual-fs-num').on('input', function () {
                 const val = $(this).val();
-                self.$currentBlock.removeClass('alignfull alignconstrained');
-                if (val) self.$currentBlock.addClass('align' + val);
+                $('#aipg-manual-fs-range, #aipg-manual-fs-num').val(val);
+                if (self.$currentBlock) self.$currentBlock.css('font-size', val + 'px');
                 self.markAsManualChanged();
             });
 
-            $('#aipg-manual-img-width').on('input', function () {
-                const val = $(this).val();
-                const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
-                if ($img.length) {
-                    $img.css('max-width', val + '%');
+            // Link Buttons logic
+            $('#aipg-link-margin').on('click', function () {
+                $(this).toggleClass('active');
+            });
+            $('#aipg-link-padding').on('click', function () {
+                $(this).toggleClass('active');
+            });
+
+            // Unit Selectors
+            $('.aipg-unit-select').on('change', function () {
+                const type = $(this).attr('id') === 'aipg-margin-unit' ? 'margin' : 'padding';
+                const unit = $(this).val();
+                const $slider = $('#aipg-slider-' + type);
+
+                if (unit === 'px' || unit === '%') {
+                    $slider.attr('max', 200);
+                    $slider.attr('step', 1);
+                } else {
+                    $slider.attr('max', 10);
+                    $slider.attr('step', 0.1);
                 }
-                self.markAsManualChanged();
+
+                if (type === 'margin') $('#aipg-slider-margin').trigger('input');
+                else $('#aipg-slider-padding').trigger('input');
             });
 
-            $('#aipg-manual-pt, #aipg-manual-pb').on('input', function () {
+            // Sliders logic
+            $('#aipg-slider-margin').on('input', function () {
+                const val = $(this).val();
+                const u = $('#aipg-margin-unit').val();
+                if ($('#aipg-link-margin').hasClass('active')) {
+                    $('#aipg-manual-mt, #aipg-manual-mb, #aipg-manual-ml, #aipg-manual-mr').val(val);
+                    if (self.$currentBlock) {
+                        self.$currentBlock.css('margin-top', val + u);
+                        self.$currentBlock.css('margin-bottom', val + u);
+                        self.$currentBlock.css('margin-left', val + u);
+                        self.$currentBlock.css('margin-right', val + u);
+                        self.markAsManualChanged();
+                    }
+                }
+            });
+
+            $('#aipg-slider-padding').on('input', function () {
+                const val = $(this).val();
+                const u = $('#aipg-padding-unit').val();
+                if ($('#aipg-link-padding').hasClass('active')) {
+                    $('#aipg-manual-pt, #aipg-manual-pb, #aipg-manual-pl, #aipg-manual-pr').val(val);
+                    if (self.$currentBlock) {
+                        self.$currentBlock.css('padding-top', val + u);
+                        self.$currentBlock.css('padding-bottom', val + u);
+                        self.$currentBlock.css('padding-left', val + u);
+                        self.$currentBlock.css('padding-right', val + u);
+                        self.markAsManualChanged();
+                    }
+                }
+            });
+
+            // Input logic with Linking overrides
+            $('#aipg-manual-mt, #aipg-manual-mb, #aipg-manual-ml, #aipg-manual-mr').on('input', function () {
+                const val = $(this).val();
+                const u = $('#aipg-margin-unit').val();
+                if ($('#aipg-link-margin').hasClass('active') && val !== '') {
+                    $('#aipg-manual-mt, #aipg-manual-mb, #aipg-manual-ml, #aipg-manual-mr').val(val);
+                    $('#aipg-slider-margin').val(val);
+                }
+                const mt = $('#aipg-manual-mt').val();
+                const mb = $('#aipg-manual-mb').val();
+                const ml = $('#aipg-manual-ml').val();
+                const mr = $('#aipg-manual-mr').val();
+
+                if (self.$currentBlock) {
+                    if (mt !== '') self.$currentBlock.css('margin-top', mt + u);
+                    if (mb !== '') self.$currentBlock.css('margin-bottom', mb + u);
+                    if (ml !== '') self.$currentBlock.css('margin-left', ml + u);
+                    if (mr !== '') self.$currentBlock.css('margin-right', mr + u);
+                    self.markAsManualChanged();
+                }
+            });
+
+            $('#aipg-manual-pt, #aipg-manual-pb, #aipg-manual-pl, #aipg-manual-pr').on('input', function () {
+                const val = $(this).val();
+                const u = $('#aipg-padding-unit').val();
+                if ($('#aipg-link-padding').hasClass('active') && val !== '') {
+                    $('#aipg-manual-pt, #aipg-manual-pb, #aipg-manual-pl, #aipg-manual-pr').val(val);
+                    $('#aipg-slider-padding').val(val);
+                }
                 const pt = $('#aipg-manual-pt').val();
                 const pb = $('#aipg-manual-pb').val();
+                const pl = $('#aipg-manual-pl').val();
+                const pr = $('#aipg-manual-pr').val();
+
                 if (self.$currentBlock) {
-                    if (pt) self.$currentBlock.css('padding-top', pt + 'rem');
-                    if (pb) self.$currentBlock.css('padding-bottom', pb + 'rem');
-                }
-                self.markAsManualChanged();
-            });
-
-            $('#aipg-manual-bg-color').on('input', function () {
-                const val = $(this).val();
-                if (self.$currentBlock) self.$currentBlock.css('background-color', val);
-                self.markAsManualChanged();
-            });
-
-            // Media tab handlers
-            $('#aipg-manual-img-width').on('input', function () {
-                const val = $(this).val();
-                $('#aipg-img-width-val').text(val + '%');
-                const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
-                if ($img.length) {
-                    $img.css('max-width', val + '%');
-                }
-                self.markAsManualChanged();
-            });
-
-            // Media Library Integration
-            $('#aipg-change-media-btn, #aipg-change-media').on('click', function (e) {
-                e.preventDefault();
-                if (typeof wp === 'undefined' || !wp.media) return;
-
-                const frame = wp.media({
-                    title: 'Select or Upload Media',
-                    button: { text: 'Use this media' },
-                    multiple: false
-                });
-
-                frame.on('select', function () {
-                    const attachment = frame.state().get('selection').first().toJSON();
-                    if (self.$currentBlock) {
-                        const $img = self.$currentBlock.is('img') ? self.$currentBlock : self.$currentBlock.find('img').first();
-                        if ($img.length) {
-                            $img.attr('src', attachment.url);
-                            if (attachment.alt) $img.attr('alt', attachment.alt);
-                        }
-                    }
+                    if (pt !== '') self.$currentBlock.css('padding-top', pt + u);
+                    if (pb !== '') self.$currentBlock.css('padding-bottom', pb + u);
+                    if (pl !== '') self.$currentBlock.css('padding-left', pl + u);
+                    if (pr !== '') self.$currentBlock.css('padding-right', pr + u);
                     self.markAsManualChanged();
-                });
-                frame.open();
+                }
             });
 
             // Add Tab handlers
             $('.aipg-add-item').on('click', function () {
                 const type = $(this).data('block');
-                self.insertNewBlock(type, 'below');
+
+                // One-step insertion for media types (Logo/Image)
+                if ((type === 'logo' || type === 'image') && typeof wp !== 'undefined' && wp.media) {
+                    const frame = wp.media({
+                        title: 'Select ' + (type === 'logo' ? 'Logo' : 'Image'),
+                        button: { text: 'Insert Block' },
+                        multiple: false
+                    });
+
+                    frame.on('select', function () {
+                        const attachment = frame.state().get('selection').first().toJSON();
+                        if (attachment && attachment.url) {
+                            self.insertNewBlock(type, 'below', attachment.url);
+                        }
+                    });
+
+                    frame.open();
+                } else if (type === 'logo' || type === 'image') {
+                    // Fallback if media library fails to load for some reason
+                    console.error('[AI Studio] WordPress Media Library not available on frontend.');
+                    alert('WordPress Media Library is not available. Please ensure you are logged in as admin.');
+                } else {
+                    self.insertNewBlock(type, 'below');
+                }
             });
 
             $('.aipg-mini-btn').on('click', function () {
                 $('.aipg-mini-btn').removeClass('active');
                 $(this).addClass('active');
+            });
+
+            // Omni-directional insertion
+            $(document).on('click', '.aipg-omni-dup', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!self.$currentBlock) return;
+                self.omniInsertElement('duplicate', $(this).data('dir'), '');
+            });
+
+            $(document).on('click', '.aipg-omni-ai', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!self.$currentBlock) return;
+
+                // Store direction and open custom modal instead of native prompt
+                self.omniPendingDir = $(this).data('dir');
+                $('.aipg-modal-backdrop').fadeIn(200);
+                $('#aipg-omni-prompt-modal').fadeIn(200);
+                $('#aipg-omni-prompt-input').val('').focus();
+                self.isEditing = true;
+            });
+
+            $(document).on('click', '#aipg-omni-prompt-cancel', function () {
+                $('#aipg-omni-prompt-modal').fadeOut(200);
+                $('.aipg-modal-backdrop').fadeOut(200);
+                self.isEditing = false;
+            });
+
+            $(document).on('click', '#aipg-omni-prompt-submit', function () {
+                const promptMsg = $('#aipg-omni-prompt-input').val().trim();
+                if (!promptMsg) return;
+
+                $('#aipg-omni-prompt-modal').fadeOut(200);
+                $('.aipg-modal-backdrop').fadeOut(200);
+                self.isEditing = false;
+
+                self.omniInsertElement('ai', self.omniPendingDir, promptMsg);
             });
 
             // Save Buttons
@@ -487,6 +708,10 @@
             $('.aipg-modal-backdrop').on('click', () => {
                 self.closeModal();
                 self.closeErrorModal();
+                if ($('#aipg-omni-prompt-modal').is(':visible')) {
+                    $('#aipg-omni-prompt-modal').fadeOut(200);
+                    self.isEditing = false;
+                }
             });
         },
 
@@ -608,11 +833,55 @@
             $('#aipg-manual-fs-num').val(fs);
             $('#aipg-manual-text-color').val(this.rgbToHex(styles.color));
 
-            // Spacing
-            const ptPx = parseFloat(styles.paddingTop) || 0;
-            const pbPx = parseFloat(styles.paddingBottom) || 0;
-            $('#aipg-manual-pt').val((ptPx / 16).toFixed(1));
-            $('#aipg-manual-pb').val((pbPx / 16).toFixed(1));
+            // Spacing Initialization
+            const getInlineUnitAndVal = (computedPx, inlineStyleStr, defaultUnit) => {
+                let u = defaultUnit;
+                let v = 0;
+                if (inlineStyleStr && inlineStyleStr.match(/[a-z%]+$/)) {
+                    u = inlineStyleStr.match(/[a-z%]+$/)[0];
+                    v = parseFloat(inlineStyleStr);
+                } else if (inlineStyleStr && parseFloat(inlineStyleStr)) {
+                    v = parseFloat(inlineStyleStr);
+                } else {
+                    const pxNum = parseFloat(computedPx) || 0;
+                    if (pxNum) {
+                        if (u === 'rem' || u === 'em') v = (pxNum / 16).toFixed(1);
+                        else v = pxNum;
+                    }
+                }
+                return { unit: u, val: v };
+            };
+
+            const ptData = getInlineUnitAndVal(styles.paddingTop, el.style.paddingTop, 'rem');
+            const mtData = getInlineUnitAndVal(styles.marginTop, el.style.marginTop, 'rem');
+
+            $('#aipg-padding-unit').val(ptData.unit).trigger('change');
+            $('#aipg-margin-unit').val(mtData.unit).trigger('change');
+
+            const pbData = getInlineUnitAndVal(styles.paddingBottom, el.style.paddingBottom, ptData.unit);
+            const plData = getInlineUnitAndVal(styles.paddingLeft, el.style.paddingLeft, ptData.unit);
+            const prData = getInlineUnitAndVal(styles.paddingRight, el.style.paddingRight, ptData.unit);
+
+            const mbData = getInlineUnitAndVal(styles.marginBottom, el.style.marginBottom, mtData.unit);
+            const mlData = getInlineUnitAndVal(styles.marginLeft, el.style.marginLeft, mtData.unit);
+            const mrData = getInlineUnitAndVal(styles.marginRight, el.style.marginRight, mtData.unit);
+
+            $('#aipg-manual-pt').val(ptData.val || '');
+            $('#aipg-manual-pb').val(pbData.val || '');
+            $('#aipg-manual-pl').val(plData.val || '');
+            $('#aipg-manual-pr').val(prData.val || '');
+
+            $('#aipg-manual-mt').val(mtData.val || '');
+            $('#aipg-manual-mb').val(mbData.val || '');
+            $('#aipg-manual-ml').val(mlData.val || '');
+            $('#aipg-manual-mr').val(mrData.val || '');
+
+            // Update sliders based on first valid value
+            if (ptData.val) $('#aipg-slider-padding').val(ptData.val);
+            else $('#aipg-slider-padding').val(0);
+
+            if (mtData.val) $('#aipg-slider-margin').val(mtData.val);
+            else $('#aipg-slider-margin').val(0);
 
             // Width
             if (this.$currentBlock.hasClass('alignfull')) $('#aipg-manual-width').val('full');
@@ -644,12 +913,22 @@
 
             // Extract values for the backend to handle grammar nicely
             const width = $('#aipg-manual-width').val();
-            const pt = $('#aipg-manual-pt').val();
-            const pb = $('#aipg-manual-pb').val();
+            const pU = $('#aipg-padding-unit').val();
+            const mU = $('#aipg-margin-unit').val();
+
+            const pt = $('#aipg-manual-pt').val() !== '' ? $('#aipg-manual-pt').val() + pU : '';
+            const pb = $('#aipg-manual-pb').val() !== '' ? $('#aipg-manual-pb').val() + pU : '';
+            const pl = $('#aipg-manual-pl').val() !== '' ? $('#aipg-manual-pl').val() + pU : '';
+            const pr = $('#aipg-manual-pr').val() !== '' ? $('#aipg-manual-pr').val() + pU : '';
+            const mt = $('#aipg-manual-mt').val() !== '' ? $('#aipg-manual-mt').val() + mU : '';
+            const mb = $('#aipg-manual-mb').val() !== '' ? $('#aipg-manual-mb').val() + mU : '';
+            const ml = $('#aipg-manual-ml').val() !== '' ? $('#aipg-manual-ml').val() + mU : '';
+            const mr = $('#aipg-manual-mr').val() !== '' ? $('#aipg-manual-mr').val() + mU : '';
+
             const bgColor = $('#aipg-manual-bg-color').val();
             const textColor = $('#aipg-manual-text-color').val();
             const fontSize = $('#aipg-manual-fs-range').val();
-            const imgWidth = $('#aipg-manual-img-width').val(); // New: Image width
+            const imgWidth = $('#aipg-manual-img-width').val();
 
             // Prepare markup (always grab fresh DOM)
             const $clone = $block.clone();
@@ -667,10 +946,16 @@
                 width: width,
                 padding_top: pt,
                 padding_bottom: pb,
+                padding_left: pl,
+                padding_right: pr,
+                margin_top: mt,
+                margin_bottom: mb,
+                margin_left: ml,
+                margin_right: mr,
                 bg_color: bgColor,
                 text_color: textColor,
                 font_size: fontSize,
-                img_width: imgWidth // New: Image width
+                img_width: imgWidth
             };
 
             $.ajax({
@@ -695,18 +980,24 @@
             });
         },
 
-        insertNewBlock: function (type, position) {
+        insertNewBlock: function (type, position, mediaUrl = null) {
             if (!this.$currentBlock) return;
             const self = this;
 
             // Temporary insertion for visual feedback
             let html = '';
+            const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 24 24' fill='none' stroke='%23e67e22' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+
             switch (type) {
                 case 'heading': html = '<h2>New Heading</h2>'; break;
                 case 'paragraph': html = '<p>Write your content here...</p>'; break;
                 case 'button': html = '<div class="wp-block-button"><a class="wp-block-button__link wp-element-button">Click Me</a></div>'; break;
-                case 'image': html = '<figure class="wp-block-image size-full"><img src="https://via.placeholder.com/800x400" alt="Placeholder"></figure>'; break;
-                case 'logo': html = '<div class="wp-block-site-logo"><a class="custom-logo-link"><img src="https://via.placeholder.com/150" style="max-width:150px;" alt="Logo"></a></div>'; break;
+                case 'image':
+                    html = '<figure class="wp-block-image size-full"><img src="' + (mediaUrl || placeholderImg) + '" alt="Added Image"></figure>';
+                    break;
+                case 'logo':
+                    html = '<div class="wp-block-site-logo"><a class="custom-logo-link"><img src="' + (mediaUrl || placeholderImg) + '" style="max-width:150px;" alt="Logo"></a></div>';
+                    break;
                 case 'spacer': html = '<div style="height:50px" class="wp-block-spacer"></div>'; break;
             }
 
@@ -718,6 +1009,109 @@
 
             // We trigger a "manual save" of the WHOLE CONTAINER to ensure the new block is in the DB
             this.markAsManualChanged();
+        },
+
+        omniInsertElement: function (actionType, position, promptStr) {
+            const self = this;
+            let $block = this.$currentBlock;
+            if (!$block) return;
+
+            // CRITICAL FIX: The user might be hovering on an internal structure element (like <span class="wp-block-cover__background">)
+            // that is NOT a real Gutenberg block in the DB. We MUST find the closest actual block wrapper.
+            // Rule 1: It MUST have a class starting with wp-block-
+            // Rule 2: It CANNOT be a BEM child element (containing __)
+            // Rule 3: It CANNOT be a generic inline/media tag disguised as a block root.
+            while ($block.length) {
+                const hasBlockClass = $block[0].className && $block[0].className.includes('wp-block-');
+                const isBEMChild = $block[0].className && $block[0].className.includes('__');
+                const isDisallowedTag = $block.is('span, img, a, strong, em, b, i');
+
+                if (hasBlockClass && !isBEMChild && !isDisallowedTag) {
+                    break; // Found a valid root block
+                }
+
+                const $parent = $block.parent().closest('[class*="wp-block-"]');
+                if ($parent.length && $parent[0] !== $block[0]) {
+                    $block = $parent;
+                } else {
+                    break;
+                }
+            }
+
+            // Visual feedback
+            const originalBorder = $block.css('border');
+            $block.css('border', '2px dashed #4ade80');
+
+            // Clean up temporary styles that shouldn't be in DB
+            const $clone = $block.clone();
+
+            // Remove ALL our custom structural editor classes before sending to PHP
+            // Because PHP's aipg_find_block_in_tree needs a close match to what's in the DB.
+            $clone.removeClass(function (index, className) {
+                return (className.match(/(^|\s)aipg-\S+/g) || []).join(' ');
+            });
+            $clone.removeAttr('data-aipg-hover');
+
+            // CRITICAL STRIPPING: Remove styles that are likely visual-only or injected by the browser/resizers.
+            // Gutenberg block HTML in the DB rarely has complex `style=` tags unless explicitly set.
+            // When we compare strings, `style="min-height: 900px;"` might fail against `style="min-height:900px"`,
+            // or worse, the browser adds `aspect-ratio`, `background-position`, etc.
+            // We'll remove the `style` attribute entirely from the clone to force a structural/class-based match in PHP.
+            $clone.removeAttr('style');
+            $clone.find('*').removeAttr('style');
+
+            // Also clean up any potential omni-nodes that might have been accidentally cloned
+            $clone.find('.aipg-omni-node').remove();
+
+            const targetMarkup = $clone[0].outerHTML;
+
+            const payload = {
+                action: 'aipg_studio_insert_element',
+                nonce: aipg_editor_vars.nonce,
+                action_type: actionType,
+                position: position,
+                prompt: promptStr,
+                lookup_markup: targetMarkup,
+                post_id: parseInt(aipg_editor_vars.post_id, 10),
+                model_tier: this.modelTier
+            };
+
+            console.log(`[AI Studio] Omni-Insert (${actionType} @ ${position}) payload:`, payload);
+
+            $.ajax({
+                url: aipg_editor_vars.ajaxurl,
+                type: 'POST',
+                data: payload,
+                timeout: 90000,
+                success: function (response) {
+                    $block.css('border', originalBorder || '');
+                    if (response.success) {
+                        const newRendered = response.data.new_rendered;
+                        const $newElement = $(newRendered);
+                        $newElement.addClass('aipg-fade-in');
+
+                        if (position === 'top' || position === 'left') {
+                            $block.before($newElement);
+                        } else {
+                            $block.after($newElement);
+                        }
+
+                        // Briefly highlight the new element
+                        setTimeout(() => {
+                            $newElement.removeClass('aipg-fade-in');
+                            self.highlightBlock($newElement);
+                        }, 500);
+
+                    } else {
+                        const errorMsg = typeof response.data === 'string' ? response.data : (response.data.message || 'Unknown error');
+                        self.showErrorModal('Insertion failed: ' + errorMsg);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    $block.css('border', originalBorder || '');
+                    self.showErrorModal('Network error during insertion: ' + status);
+                }
+            });
         },
 
         getComputedStyles: function ($el) {

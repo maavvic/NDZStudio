@@ -376,3 +376,14 @@
   
   <div style="display:flex;align-items:center;justify-content:sp...
 2026-03-09 21:52:41 - DB Diags: ["Updating existing DB Template Part Post ID: 134","Successfully saved Template Part DB ID: 134","Final Template Part HTML Length: 1803 (Tag: header)"]
+2026-03-11 18:16:25 - INSERT REJECTED. Target not found in tree.
+Target HTML Length: 162
+Target HTML Snippet: <span aria-hidden="true" class="wp-block-cover__background" style="background-color: rgb(6, 78, 59); opacity: 0.55; border: 2px dashed rgb(74, 222, 128);"></span>
+2026-03-11 18:18:30 - INSERT REJECTED. Target not found in tree.
+Target HTML Length: 162
+Target HTML Snippet: <span aria-hidden="true" class="wp-block-cover__background" style="background-color: rgb(6, 78, 59); opacity: 0.55; border: 2px dashed rgb(74, 222, 128);"></span>
+2026-03-11 18:21:14 - INSERT REJECTED. Target not found in tree.
+Target HTML Length: 2017
+Target HTML Snippet: <div class="wp-block-cover alignfull" style="background-image: url(&quot;https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=1600&amp;q=80&quot;); background-size: cover; background-position: center center; min-height: 900px; margin: 0px; padding: 0px clamp(1.5rem, 5vw, 4rem); aspect-rati
+2026-03-11 18:23:42 - SUCCESS: Tree successfully mutated.
+2026-03-11 18:23:42 - DB Diags: ["No active_template, updating original post ID: 686","Updated ID: 686"]

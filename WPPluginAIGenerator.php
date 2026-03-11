@@ -226,6 +226,7 @@ function aipg_enqueue_studio_editor() {
     if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
     // Base Editor scripts (Mainly for overlay)
+    wp_enqueue_media(); // Required for one-step media selection
     wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
     wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], uniqid(), true );
 
@@ -2458,6 +2459,8 @@ function aipg_ajax_remove_studio_project() {
  */
 add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
 add_action( 'wp_ajax_nopriv_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+add_action( 'wp_ajax_aipg_studio_insert_element', 'aipg_ajax_studio_insert_element' );
+add_action( 'wp_ajax_nopriv_aipg_studio_insert_element', 'aipg_ajax_studio_insert_element' );
 add_action( 'wp_ajax_aipg_save_as_project', 'aipg_ajax_save_as_project' );
 add_action( 'wp_ajax_nopriv_aipg_save_as_project', 'aipg_ajax_save_as_project' );
 function aipg_ajax_studio_contextual_edit() {
@@ -2856,6 +2859,164 @@ function aipg_ajax_studio_contextual_edit() {
 }
 
 /**
+ * AJAX Handler for Omni-Directional Block Insertion (Duplicate or AI Generate)
+ */
+function aipg_ajax_studio_insert_element() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+
+    if ( function_exists( 'set_time_limit' ) ) {
+        @set_time_limit( 240 ); 
+    }
+
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+
+    $position      = isset( $_POST['position'] ) ? sanitize_text_field( wp_unslash( $_POST['position'] ) ) : 'after';
+    $lookup_markup = isset( $_POST['lookup_markup'] ) ? wp_unslash( $_POST['lookup_markup'] ) : ''; // The target block
+    $post_id       = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $prompt        = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+    $action_type   = isset( $_POST['action_type'] ) ? sanitize_text_field( wp_unslash( $_POST['action_type'] ) ) : 'duplicate'; // 'duplicate' or 'ai'
+
+    if ( empty( $lookup_markup ) || ! $post_id ) {
+        wp_send_json_error( 'Incomplete data for block insertion.' );
+    }
+
+    $matched_block_node = null;
+    $target_post_id = $post_id;
+    $is_new_template = false;
+    $full_parsed_tree = [];
+    $active_template = null;
+    $search_debug_log = [];
+
+    global $post;
+    $post = get_post($post_id);
+    setup_postdata($post);
+
+    // Find block
+    $full_parsed_tree = parse_blocks( $post->post_content );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
+
+    if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
+        foreach($templates as $t) {
+            $test_tree = parse_blocks( $t->content );
+            $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
+            if ( $match ) {
+                $matched_block_node = $match;
+                $full_parsed_tree = $test_tree;
+                $active_template = $t;
+                break;
+            }
+        }
+    }
+    wp_reset_postdata();
+
+    if ( ! $matched_block_node ) {
+        file_put_contents(__DIR__ . '/debug.log', date('Y-m-d H:i:s') . " - INSERT REJECTED. Target not found in tree.\n", FILE_APPEND);
+        file_put_contents(__DIR__ . '/debug.log', "Target HTML Length: " . strlen($lookup_markup) . "\n", FILE_APPEND);
+        file_put_contents(__DIR__ . '/debug.log', "Target HTML Snippet: " . substr($lookup_markup, 0, 300) . "\n", FILE_APPEND);
+        wp_send_json_error( 'Could not identify the target block in the database for insertion.' );
+    }
+
+    $new_block_grammar = '';
+    $new_blocks_array = [];
+
+    if ( $action_type === 'duplicate' ) {
+        // Clone the PHP node exactly
+        $new_blocks_array = [ $matched_block_node ];
+        $new_block_grammar = serialize_blocks( $new_blocks_array );
+    } else {
+        // AI Generation Call
+        $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
+        $license = get_option( 'aipg_license_key', '' );
+        $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-block';
+
+        $site_info = get_option( 'aipg_site_info', [] );
+        $industry  = isset($site_info['industry']) ? $site_info['industry'] : '';
+        $model_tier = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'medium';
+
+        $response = wp_remote_post( $endpoint, [
+            'headers'     => [
+                'Content-Type'    => 'application/json',
+                'X-License-Key'   => $license
+            ],
+            'body'        => wp_json_encode([
+                'prompt'          => $prompt,
+                'parent_markup'   => serialize_blocks([$matched_block_node]), // Use target as context
+                'model_tier'      => $model_tier,
+                'industry'        => $industry,
+                'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
+            ]),
+            'timeout'     => 120,
+        ]);
+
+        if ( is_wp_error( $response ) ) {
+            wp_send_json_error( $response->get_error_message() );
+        }
+
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+        
+        if ( ! $data || ! isset( $data['new_markup'] ) ) {
+            wp_send_json_error( 'AI failed to generate a block.' );
+        }
+        $new_block_grammar = $data['new_markup'];
+        
+        // Ensure the AI returned Gutenberg block grammar. If not, wrap it in an HTML block.
+        if ( strpos($new_block_grammar, '<!-- wp:') === false ) {
+            $new_block_grammar = "<!-- wp:html -->\n" . trim($new_block_grammar) . "\n<!-- /wp:html -->";
+        }
+        $new_blocks_array = parse_blocks( $new_block_grammar );
+        // parse_blocks always returns an array where empty space is a block, let's filter just valid blocks
+        $new_blocks_array = array_values(array_filter($new_blocks_array, function($b) {
+            return !empty($b['blockName']) || (!empty($b['innerHTML']) && trim($b['innerHTML']) !== '');
+        }));
+    }
+
+    // Insert into tree
+    $updated_tree = aipg_insert_block_in_tree( $full_parsed_tree, $matched_block_node, $new_blocks_array, $position );
+
+    if ( $updated_tree === $full_parsed_tree ) {
+        wp_send_json_error( 'Failed to insert the block into the syntax tree.' );
+    }
+
+    $new_post_content = serialize_blocks( $updated_tree );
+
+    // Save Logic (same as contextual edit)
+    if ( $active_template ) {
+        if ( 'theme' === $active_template->source || empty( $active_template->wp_id ) ) {
+            $is_new_template = true;
+            $target_post_id = wp_insert_post( [
+                'post_content' => wp_slash( $new_post_content ),
+                'post_name'    => $active_template->slug,
+                'post_title'   => $active_template->title,
+                'post_type'    => $active_template->type,
+                'post_status'  => 'publish',
+            ] );
+            if ( ! is_wp_error( $target_post_id ) ) {
+                wp_set_object_terms( $target_post_id, $active_template->theme, 'wp_theme' );
+            }
+        } else {
+            $target_post_id = $active_template->wp_id;
+        }
+    }
+
+    if ( ! $is_new_template ) {
+        wp_update_post([
+            'ID'           => $target_post_id,
+            'post_content' => wp_slash( $new_post_content )
+        ]);
+    }
+
+    // Return the rendered HTML of the new block(s) so frontend can inject it and preview
+    $rendered_markup = do_blocks( $new_block_grammar );
+
+    wp_send_json_success([
+        'new_markup'   => $new_block_grammar,
+        'new_rendered' => $rendered_markup
+    ]);
+}
+
+/**
  * AJAX Handler for INSTANT Manual Block Tweaks (Zero AI)
  */
 add_action( 'wp_ajax_aipg_studio_manual_edit', 'aipg_ajax_studio_manual_edit' );
@@ -2871,6 +3032,12 @@ function aipg_ajax_studio_manual_edit() {
     $width           = isset( $_POST['width'] ) ? sanitize_text_field( $_POST['width'] ) : ''; // 'full', 'constrained', ''
     $padding_top     = isset( $_POST['padding_top'] ) ? sanitize_text_field( $_POST['padding_top'] ) : '';
     $padding_bottom  = isset( $_POST['padding_bottom'] ) ? sanitize_text_field( $_POST['padding_bottom'] ) : '';
+    $padding_left    = isset( $_POST['padding_left'] ) ? sanitize_text_field( $_POST['padding_left'] ) : '';
+    $padding_right   = isset( $_POST['padding_right'] ) ? sanitize_text_field( $_POST['padding_right'] ) : '';
+    $margin_top      = isset( $_POST['margin_top'] ) ? sanitize_text_field( $_POST['margin_top'] ) : '';
+    $margin_bottom   = isset( $_POST['margin_bottom'] ) ? sanitize_text_field( $_POST['margin_bottom'] ) : '';
+    $margin_left     = isset( $_POST['margin_left'] ) ? sanitize_text_field( $_POST['margin_left'] ) : '';
+    $margin_right    = isset( $_POST['margin_right'] ) ? sanitize_text_field( $_POST['margin_right'] ) : '';
     $bg_color        = isset( $_POST['bg_color'] ) ? sanitize_hex_color( $_POST['bg_color'] ) : '';
     $text_color      = isset( $_POST['text_color'] ) ? sanitize_hex_color( $_POST['text_color'] ) : '';
     $font_size       = isset( $_POST['font_size'] ) ? sanitize_text_field( $_POST['font_size'] ) : '';
@@ -2929,6 +3096,12 @@ function aipg_ajax_studio_manual_edit() {
         'width'          => $width ? $width : null,
         'padding_top'    => $padding_top !== '' ? strval($padding_top) : null,
         'padding_bottom' => $padding_bottom !== '' ? strval($padding_bottom) : null,
+        'padding_left'   => $padding_left !== '' ? strval($padding_left) : null,
+        'padding_right'  => $padding_right !== '' ? strval($padding_right) : null,
+        'margin_top'     => $margin_top !== '' ? strval($margin_top) : null,
+        'margin_bottom'  => $margin_bottom !== '' ? strval($margin_bottom) : null,
+        'margin_left'    => $margin_left !== '' ? strval($margin_left) : null,
+        'margin_right'   => $margin_right !== '' ? strval($margin_right) : null,
         'bg_color'       => $bg_color ? strval($bg_color) : null,
         'text_color'     => $text_color ? strval($text_color) : null,
         'font_size'      => $font_size ? strval($font_size) : null,
@@ -3215,23 +3388,11 @@ function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = []
                         $clean_attrs['class'] = 'class="' . implode(' ', array_unique($filtered_classes)) . '"';
                     }
                 } elseif ($name === 'style') {
-                    // Normalize style properties: split, trim, sort
-                    $props = explode(';', $val);
-                    $normalized_props = [];
-                    foreach ($props as $p) {
-                        $p = trim((string)$p);
-                        if (empty($p)) continue;
-                        $parts = explode(':', $p, 2);
-                        if (count($parts) === 2) {
-                            $prop_name = strtolower(trim((string)$parts[0]));
-                            $prop_val = trim((string)$parts[1]);
-                            $normalized_props[] = $prop_name . ':' . $prop_val;
-                        }
-                    }
-                    if (!empty($normalized_props)) {
-                        sort($normalized_props);
-                        $clean_attrs['style'] = 'style="' . implode(';', $normalized_props) . ';"';
-                    }
+                    // Normalize style properties: split, trim, sort, OR SKIP
+                    // Since the JS editor deliberately removes `style` tags on the frontend to avoid matching failure 
+                    // from browser-injected rules (like aspect-ratio), we should strip all style tags on the backend 
+                    // comparison copy too, meaning we compare ONLY by classes and structure.
+                    continue; // Simply strip style entirely during the string match normalization phase.
                 } else {
                     $clean_attrs[$name] = $name . '="' . $val . '"';
                 }
@@ -3364,6 +3525,35 @@ function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks
             if ( $updated_inner !== $block['innerBlocks'] ) {
                 $block['innerBlocks'] = $updated_inner;
                 return $parsed_blocks; // Return early once found and replaced
+            }
+        }
+    }
+    
+    return $parsed_blocks;
+}
+
+/**
+ * Helper to recursively find a block logically and insert a new block (or blocks) next to it
+ */
+function aipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blocks, $position = 'after' ) {
+    if ( empty( $new_blocks ) ) return $parsed_blocks;
+
+    foreach ( $parsed_blocks as $k => &$block ) {
+        // Strict identical check for the node object
+        if ( $block === $reference_node ) {
+            if ( $position === 'before' || $position === 'left' || $position === 'top' ) {
+                array_splice( $parsed_blocks, $k, 0, $new_blocks );
+            } else {
+                array_splice( $parsed_blocks, $k + 1, 0, $new_blocks );
+            }
+            return $parsed_blocks;
+        }
+        
+        if ( ! empty( $block['innerBlocks'] ) ) {
+            $updated_inner = aipg_insert_block_in_tree( $block['innerBlocks'], $reference_node, $new_blocks, $position );
+            if ( $updated_inner !== $block['innerBlocks'] ) {
+                $block['innerBlocks'] = $updated_inner;
+                return $parsed_blocks; // Return early once found and inserted
             }
         }
     }
