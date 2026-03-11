@@ -234,6 +234,12 @@ function aipg_inject_studio_custom_styles() {
     $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); }\n";
 
     echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
+
+    // 4. Inject Custom CSS from AI
+    $custom_css = get_option( 'aipg_studio_custom_css', '' );
+    if ( ! empty( $custom_css ) ) {
+        echo "<style id='aipg-studio-custom-ai-css'>\n/* AI Generated Styles */\n" . wp_strip_all_tags( $custom_css ) . "\n</style>\n";
+    }
 }
 
 /**
@@ -1987,7 +1993,14 @@ function aipg_ajax_install_prototype() {
     if ( isset( $data['theme_json'] ) && !empty($data['theme_json'])) {
         error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
         update_option( 'aipg_studio_theme_config', $data['theme_json'] );
-    } 
+    }
+
+    // Store Custom CSS if provided
+    if ( isset( $data['custom_css'] ) ) {
+        update_option( 'aipg_studio_custom_css', $data['custom_css'] );
+    } else {
+        delete_option( 'aipg_studio_custom_css' );
+    }
 
     // Handle Theme Strategy
     update_option( 'aipg_studio_theme_strategy', $theme_strategy );

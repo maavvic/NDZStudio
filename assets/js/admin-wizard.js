@@ -768,11 +768,18 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                 job_id: jobId
             }, function (res) {
                 if (res.success) {
-                    const status = res.data.status;
                     const tokens = res.data.completion_tokens || 0;
 
-                    // Use 15,000 tokens as the baseline for 100% of a layout archetype
-                    const pct = Math.min(99, Math.round((res.data.completion_tokens / 15000) * 100));
+                    // Tiered Baseline: Start with 10k, shift to 15k if AI is "wordy"
+                    let baseline = (tokens > 10000) ? 15000 : 10000;
+                    let pct = Math.round((tokens / baseline) * 100);
+
+                    // Safety: Never let progress jump backward if baseline shifts
+                    const prevPct = parseInt($('#ws-finish-percentage').text()) || 0;
+                    if (pct < prevPct && status !== 'COMPLETED') {
+                        pct = Math.min(prevPct + 1, 99);
+                    }
+                    pct = Math.min(99, pct);
 
                     if (status === 'COMPLETED') {
                         $('#ws-finish-progress-fill').css('width', '100%');
@@ -783,13 +790,13 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                         self.showError('AI Generation failed. The server might be overloaded or returned invalid data.', true);
                     } else {
                         // Still processing
-                        $('#ws-finish-progress-fill').css('width', percent + '%');
-                        $('#ws-finish-percentage').text(percent + '%');
+                        $('#ws-finish-progress-fill').css('width', pct + '%');
+                        $('#ws-finish-percentage').text(pct + '%');
 
                         // Dynamic status updates
                         if (tokens === 0) $('#ws-finish-status').text('AI is thinking and architecting the concept...');
-                        else if (percent > 80) $('#ws-finish-status').text('Finalizing the multi-page structure...');
-                        else if (percent > 40) $('#ws-finish-status').text('Generating block content and layouts...');
+                        else if (pct > 80) $('#ws-finish-status').text('Finalizing the multi-page structure...');
+                        else if (pct > 40) $('#ws-finish-status').text('Generating block content and layouts...');
                         else $('#ws-finish-status').text('Streaming visual vision from AI...');
 
                         setTimeout(() => self.pollStudioJob(jobId, layoutId), 3000);
@@ -1183,8 +1190,9 @@ console.log('%c[Wizard] admin-wizard.js Loaded Successfully', 'color: white; bac
                             const isStalled = updatedAt && (now - updatedAt > 60000); // 1 minute without update
 
                             if (tokens > 0) {
-                                // Calculate actual percentage based on ~15,000 token estimate
-                                let pct = Math.floor((tokens / 15000) * 100);
+                                // Tiered Baseline: Start with 10k, shift to 15k if exceeds
+                                let baseline = (tokens > 10000) ? 15000 : 10000;
+                                let pct = Math.floor((tokens / baseline) * 100);
                                 if (pct > 99) pct = 99;
 
                                 // Ensure progress never goes backward

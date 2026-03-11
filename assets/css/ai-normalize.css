@@ -24,11 +24,21 @@ main .alignfull {
 main,
 .site-main,
 #main,
-#content {
+#content,
+.entry-content {
     padding-top: 0 !important;
     padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
+    max-width: none !important;
+}
+
+/* 2.1 Prevent theme font leakage in wrappers */
+.entry-content,
+.wp-site-blocks {
+    font-family: inherit !important;
 }
 
 /* 3. Aggressive Reset for nested AI elements to prevent theme 'bleed' */
