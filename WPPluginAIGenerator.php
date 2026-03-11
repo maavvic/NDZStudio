@@ -161,28 +161,33 @@ function aipg_enqueue_admin_assets( $hook ) {
 }
 
 /**
- * Enqueue AI Studio Editor Overlay on Frontend
+ * Global Normalization for AI Pages
+ */
+add_action( 'wp_enqueue_scripts', 'aipg_load_global_normalize', 5 );
+function aipg_load_global_normalize() {
+    $post_id = get_queried_object_id();
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
+
+    $theme_strategy = get_option( 'aipg_studio_theme_strategy', 'normalize_css' );
+    if ( $theme_strategy === 'normalize_css' ) {
+        // Use time() as version for aggressive cache busting
+        wp_enqueue_style( 'aipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], time() );
+    }
+}
+
+/**
+ * Enqueue AI Studio Editor Overlay on Frontend (Admin Only)
  */
 add_action( 'wp_enqueue_scripts', 'aipg_enqueue_studio_editor' );
 function aipg_enqueue_studio_editor() {
     if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) return;
     
-    // Use queried object ID for better reliability on front page
     $post_id = get_queried_object_id();
-    if ( ! $post_id ) return;
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
-    // Check if this is an AI Studio generated page
-    if ( ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
-
-    // Base Editor scripts
+    // Base Editor scripts (Mainly for overlay)
     wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
     wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], uniqid(), true );
-
-    // Enqueue CSS Reset if Theme Strategy falls back to Add to Existing
-    $theme_strategy = get_option( 'aipg_studio_theme_strategy', 'normalize_css' );
-    if ( $theme_strategy === 'normalize_css' ) {
-        wp_enqueue_style( 'aipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], AIPG_VERSION );
-    }
 
     wp_localize_script( 'aipg-studio-editor-script', 'aipg_editor_vars', [
         'ajaxurl'    => admin_url( 'admin-ajax.php' ),
@@ -228,10 +233,16 @@ function aipg_inject_studio_custom_styles() {
         }
     }
 
-    $css .= "}\n";
+    $css .= "} \n";
+
+    // SUPER-RESET: Forcefully zero out the main Gutenberg content container to win against inline theme styles
+    $css .= "body .entry-content, body .wp-block-post-content, body [class*='wp-block-post-content'] { \n";
+    $css .= "  padding: 0 !important; margin: 0 !important; max-width: none !important; \n";
+    $css .= "  font-family: inherit !important; \n";
+    $css .= "} \n";
 
     // Also inject a helper to ensure blocks use these colors if the theme is stubborn
-    $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); }\n";
+    $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); } \n";
 
     echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
 

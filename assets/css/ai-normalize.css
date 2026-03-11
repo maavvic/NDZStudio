@@ -21,23 +21,29 @@ main .alignfull {
 }
 
 /* 2. Remove Theme-Injected Gaps & Padding on Main Areas */
-main,
-.site-main,
-#main,
-#content,
-.entry-content {
+body main,
+body .site-main,
+body #main,
+body #content,
+body .entry-content,
+body .wp-block-post-content,
+body [class*="wp-block-post-content"] {
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
     margin-top: 0 !important;
     margin-bottom: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     max-width: none !important;
+    min-height: 0 !important;
 }
 
 /* 2.1 Prevent theme font leakage in wrappers */
 .entry-content,
-.wp-site-blocks {
+.wp-site-blocks,
+.wp-block-post-content {
     font-family: inherit !important;
 }
 
