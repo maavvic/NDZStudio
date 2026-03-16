@@ -10,7 +10,7 @@
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
-define( 'NDZAIPG_VERSION', '1.2.4' );
+define( 'AIPG_VERSION', '1.2.4' );
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -20,11 +20,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once plugin_dir_path( __FILE__ ) . 'inc/admin-wizard.php';
 
 // 1. Plugin Activation - Create Database Table
-register_activation_hook( __FILE__, 'ndzaipg_create_database_table' );
+register_activation_hook( __FILE__, 'aipg_create_database_table' );
 
 
 
-function ndzaipg_create_database_table() {
+function aipg_create_database_table() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'ai_plugins';
     $charset_collate = $wpdb->get_charset_collate();
@@ -48,7 +48,7 @@ function ndzaipg_create_database_table() {
     dbDelta( $sql );
 
     // Also create projects table
-    $table_projects = $wpdb->prefix . 'ndzaipg_projects';
+    $table_projects = $wpdb->prefix . 'aipg_projects';
     $sql_projects = "CREATE TABLE $table_projects (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
@@ -58,21 +58,18 @@ function ndzaipg_create_database_table() {
         PRIMARY KEY  (id)
     ) $charset_collate;";
     dbDelta( $sql_projects );
-
-    // Migration and set installation id
-    ndzaipg_get_installation_id();
 }
 
 // 2. Admin Menu Setup
-add_action( 'admin_menu', 'ndzaipg_add_admin_menu' );
+add_action( 'admin_menu', 'aipg_add_admin_menu' );
 
 // 2.1 Enqueue Admin Assets
-add_action( 'admin_enqueue_scripts', 'ndzaipg_enqueue_admin_assets' );
+add_action( 'admin_enqueue_scripts', 'aipg_enqueue_admin_assets' );
 
 // 2.2 Redirect to Wizard if no projects exist - Disabled to allow direct access to Features Generator
-// add_action( 'admin_init', 'ndzaipg_maybe_redirect_to_wizard' );
+// add_action( 'admin_init', 'aipg_maybe_redirect_to_wizard' );
 
-function ndzaipg_enqueue_admin_assets( $hook ) {
+function aipg_enqueue_admin_assets( $hook ) {
     // New menu hooks: 
     // Parent/Studio: toplevel_page_nodevzone
     // Features Generator: nodevzone_page_ai-generator
@@ -84,11 +81,11 @@ function ndzaipg_enqueue_admin_assets( $hook ) {
     }
 
     if ( $is_generator ) {
-        wp_enqueue_style( 'ndzaipg-admin-style', plugins_url( 'assets/css/admin-style.css', __FILE__ ), [], NDZAIPG_VERSION );
-        wp_enqueue_script( 'ndzaipg-admin-script', plugins_url( 'assets/js/admin-script.js', __FILE__ ), [ 'jquery' ], NDZAIPG_VERSION, true );
+        wp_enqueue_style( 'aipg-admin-style', plugins_url( 'assets/css/admin-style.css', __FILE__ ), [], AIPG_VERSION );
+        wp_enqueue_script( 'aipg-admin-script', plugins_url( 'assets/js/admin-script.js', __FILE__ ), [ 'jquery' ], AIPG_VERSION, true );
         
-        wp_localize_script( 'ndzaipg-admin-script', 'ndzaipg_vars', [
-            'nonce' => wp_create_nonce( 'ndzaipg_ajax_nonce' ),
+        wp_localize_script( 'aipg-admin-script', 'aipg_vars', [
+            'nonce' => wp_create_nonce( 'aipg_ajax_nonce' ),
             'i18n' => [
                 'loadingMessages' => [
                     esc_html__( 'Still working on your plugin...', 'ai-studio-generator' ),
@@ -149,15 +146,15 @@ function ndzaipg_enqueue_admin_assets( $hook ) {
     }
 
     if ( $is_wizard ) {
-        wp_enqueue_style( 'wp-studio-wizard-style', plugins_url( 'assets/css/wizard-styles.css', __FILE__ ), [], NDZAIPG_VERSION );
+        wp_enqueue_style( 'wp-studio-wizard-style', plugins_url( 'assets/css/wizard-styles.css', __FILE__ ), [], AIPG_VERSION );
         // Change handle to -v3 to force refresh
         wp_enqueue_script( 'wp-studio-wizard-script-v3', plugins_url( 'assets/js/admin-wizard.js', __FILE__ ), [ 'jquery' ], uniqid(), true );
 
-        // Use a new variable name ndzaipg_wizard_data to avoid clashes with any cached ndzaipg_vars
-        wp_localize_script( 'wp-studio-wizard-script-v3', 'ndzaipg_wizard_data', [
+        // Use a new variable name aipg_wizard_data to avoid clashes with any cached aipg_vars
+        wp_localize_script( 'wp-studio-wizard-script-v3', 'aipg_wizard_data', [
             'ajax_url'      => admin_url( 'admin-ajax.php' ),
-            'nonce'         => wp_create_nonce( 'ndzaipg_ajax_nonce' ),
-            'api_url'       => get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' ),
+            'nonce'         => wp_create_nonce( 'aipg_ajax_nonce' ),
+            'api_url'       => get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' ),
             'cache_bust'    => time()
         ] );
     }
@@ -166,32 +163,32 @@ function ndzaipg_enqueue_admin_assets( $hook ) {
 /**
  * Global Normalization for AI Pages
  */
-add_action( 'wp_enqueue_scripts', 'ndzaipg_load_global_normalize', 5 );
-function ndzaipg_load_global_normalize() {
+add_action( 'wp_enqueue_scripts', 'aipg_load_global_normalize', 5 );
+function aipg_load_global_normalize() {
     $post_id = get_queried_object_id();
-    if ( ! $post_id || ! get_post_meta( $post_id, '_ndzaipg_studio_page', true ) ) return;
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
-    $theme_strategy = get_option( 'ndzaipg_studio_theme_strategy', 'normalize_css' );
+    $theme_strategy = get_option( 'aipg_studio_theme_strategy', 'normalize_css' );
     if ( $theme_strategy === 'normalize_css' ) {
         // Use time() as version for aggressive cache busting
-        wp_enqueue_style( 'ndzaipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], time() );
+        wp_enqueue_style( 'aipg-studio-normalize', plugin_dir_url( __FILE__ ) . 'assets/css/ai-normalize.css', [], time() );
     }
     
     // Add Active Link Highlighter for all users on AI pages
-    add_action('wp_footer', 'ndzaipg_render_active_link_highlighter', 999);
+    add_action('wp_footer', 'aipg_render_active_link_highlighter', 999);
 }
 
 /**
  * Renders the JS helper to highlight the currently active menu item.
  */
-function ndzaipg_render_active_link_highlighter() {
+function aipg_render_active_link_highlighter() {
     ?>
-    <script id="ndzaipg-active-link-highlighter">
+    <script id="aipg-active-link-highlighter">
     (function() {
         const currentUrl = new URL(window.location.href);
         const currentPath = currentUrl.pathname.replace(/\/$/, "");
         
-        const links = document.querySelectorAll('.ndzaipg-part-header a, .wp-block-navigation-link a, .wp-block-navigation-item a');
+        const links = document.querySelectorAll('.aipg-part-header a, .wp-block-navigation-link a, .wp-block-navigation-item a');
         links.forEach(link => {
             try {
                 const linkUrl = new URL(link.href, window.location.origin);
@@ -203,7 +200,7 @@ function ndzaipg_render_active_link_highlighter() {
                     
                     // Highlight parent items for Gutenberg/Theme menus
                     let parent = link.parentElement;
-                    while (parent && !parent.classList.contains('ndzaipg-part-header')) {
+                    while (parent && !parent.classList.contains('aipg-part-header')) {
                         if (parent.classList.contains('wp-block-navigation-item')) {
                             parent.classList.add('current-menu-item');
                             parent.classList.add('is-current');
@@ -221,21 +218,21 @@ function ndzaipg_render_active_link_highlighter() {
 /**
  * Enqueue AI Studio Editor Overlay on Frontend (Admin Only)
  */
-add_action( 'wp_enqueue_scripts', 'ndzaipg_enqueue_studio_editor' );
-function ndzaipg_enqueue_studio_editor() {
+add_action( 'wp_enqueue_scripts', 'aipg_enqueue_studio_editor' );
+function aipg_enqueue_studio_editor() {
     if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) return;
     
     $post_id = get_queried_object_id();
-    if ( ! $post_id || ! get_post_meta( $post_id, '_ndzaipg_studio_page', true ) ) return;
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
     // Base Editor scripts (Mainly for overlay)
     wp_enqueue_media(); // Required for one-step media selection
-    wp_enqueue_style( 'ndzaipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], NDZAIPG_VERSION );
-    wp_enqueue_script( 'ndzaipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], uniqid(), true );
+    wp_enqueue_style( 'aipg-studio-editor-style', plugin_dir_url( __FILE__ ) . 'assets/css/ai-editor.css', [], AIPG_VERSION );
+    wp_enqueue_script( 'aipg-studio-editor-script', plugin_dir_url( __FILE__ ) . 'assets/js/ai-editor-overlay.js', [ 'jquery' ], uniqid(), true );
 
-    wp_localize_script( 'ndzaipg-studio-editor-script', 'ndzaipg_editor_vars', [
+    wp_localize_script( 'aipg-studio-editor-script', 'aipg_editor_vars', [
         'ajaxurl'    => admin_url( 'admin-ajax.php' ),
-        'nonce'      => wp_create_nonce( 'ndzaipg_editor_nonce' ),
+        'nonce'      => wp_create_nonce( 'aipg_editor_nonce' ),
         'post_id'    => $post_id,
         'wizard_url' => admin_url( 'admin.php?page=nodevzone' )
     ]);
@@ -248,12 +245,12 @@ function ndzaipg_enqueue_studio_editor() {
 /**
  * Inject AI Studio Theme Tokens as CSS Variables
  */
-add_action( 'wp_head', 'ndzaipg_inject_studio_custom_styles', 100 );
-function ndzaipg_inject_studio_custom_styles() {
+add_action( 'wp_head', 'aipg_inject_studio_custom_styles', 100 );
+function aipg_inject_studio_custom_styles() {
     $post_id = get_queried_object_id();
-    if ( ! $post_id || ! get_post_meta( $post_id, '_ndzaipg_studio_page', true ) ) return;
+    if ( ! $post_id || ! get_post_meta( $post_id, '_aipg_studio_page', true ) ) return;
 
-    $theme_config = get_option( 'ndzaipg_studio_theme_config', [] );
+    $theme_config = get_option( 'aipg_studio_theme_config', [] );
     if ( empty( $theme_config ) ) return;
 
     $css = ":root {\n";
@@ -285,7 +282,7 @@ function ndzaipg_inject_studio_custom_styles() {
     $css .= "} \n";
 
     // AI Page Base Aesthetics
-    $css .= "body.ndzaipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); } \n";
+    $css .= "body.aipg-studio-preview { background-color: var(--wp--preset--color--base, #fff); color: var(--wp--preset--color--contrast, #333); } \n";
     $css .= ".wp-block-navigation .wp-block-navigation-item > a { opacity: 0.8; transition: opacity 0.3s; } \n";
 
     // SUBTLE FALLBACK: Only used if AI doesn't provide its own .active style
@@ -301,31 +298,31 @@ function ndzaipg_inject_studio_custom_styles() {
     }
     ";
 
-    echo "<style id='ndzaipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
+    echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
 
     // 4. Inject Custom CSS from AI
-    $custom_css = get_option( 'ndzaipg_studio_custom_css', '' );
+    $custom_css = get_option( 'aipg_studio_custom_css', '' );
     if ( ! empty( $custom_css ) ) {
-        echo "<style id='ndzaipg-studio-custom-ai-css'>\n/* AI Generated Styles */\n" . wp_strip_all_tags( $custom_css ) . "\n</style>\n";
+        echo "<style id='aipg-studio-custom-ai-css'>\n/* AI Generated Styles */\n" . wp_strip_all_tags( $custom_css ) . "\n</style>\n";
     }
 }
 
 /**
  * Add body class for AI Studio pages
  */
-add_filter( 'body_class', 'ndzaipg_studio_body_class' );
-function ndzaipg_studio_body_class( $classes ) {
+add_filter( 'body_class', 'aipg_studio_body_class' );
+function aipg_studio_body_class( $classes ) {
     $post_id = get_queried_object_id();
-    if ( $post_id && get_post_meta( $post_id, '_ndzaipg_studio_page', true ) ) {
-        $classes[] = 'ndzaipg-studio-preview';
+    if ( $post_id && get_post_meta( $post_id, '_aipg_studio_page', true ) ) {
+        $classes[] = 'aipg-studio-preview';
     }
     return $classes;
 }
 
 
 
-function ndzaipg_add_admin_menu() {
-    $cap = get_option( 'ndzaipg_access_capability', 'manage_options' );
+function aipg_add_admin_menu() {
+    $cap = get_option( 'aipg_access_capability', 'manage_options' );
     if ( empty( $cap ) ) {
         $cap = 'manage_options';
     }
@@ -338,7 +335,7 @@ function ndzaipg_add_admin_menu() {
         'NoDevZone',
         $cap,
         'nodevzone',
-        'ndzaipg_render_wizard_page',
+        'aipg_render_wizard_page',
         $icon_svg,
         2
     );
@@ -350,7 +347,7 @@ function ndzaipg_add_admin_menu() {
         'AI Studio',
         $cap,
         'nodevzone',
-        'ndzaipg_render_wizard_page'
+        'aipg_render_wizard_page'
     );
 
     // 3. Submenu 2: AI Features Generator (formerly PL Generator)
@@ -360,35 +357,20 @@ function ndzaipg_add_admin_menu() {
         'AI Features Generator',
         $cap,
         'ai-generator',
-        'ndzaipg_render_page'
+        'aipg_render_page'
     );
 }
 
-// Helper to get installation ID with migration/fallback
-function ndzaipg_get_installation_id() {
-    $id = get_option( 'ndzaipg_installation_id' );
-    if ( empty( $id ) ) {
-        $id = get_option( 'aipg_installation_id' );
-        if ( ! empty( $id ) ) {
-            update_option( 'ndzaipg_installation_id', $id );
-        } else {
-            $id = wp_generate_uuid4();
-            update_option( 'ndzaipg_installation_id', $id );
-        }
-    }
-    return $id;
-}
-
 // Helper function to initiate an async job
-function ndzaipg_initiate_async_job($payload) {
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+function aipg_initiate_async_job($payload) {
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
-    if ( empty( $api_url ) ) {
-        return new WP_Error('config_missing', 'API URL must be configured.');
+    if ( empty( $license_key ) || empty( $api_url ) ) {
+        return new WP_Error('config_missing', 'API URL and License Key must be configured.');
     }
 
     $init_response = wp_remote_post( rtrim( $api_url, '/' ) . '/api/jobs', [
@@ -397,9 +379,7 @@ function ndzaipg_initiate_async_job($payload) {
         'headers' => [
             'Content-Type' => 'application/json',
             'X-License-Key' => $license_key,
-            'X-Installation-Id' => ndzaipg_get_installation_id(),
-            'X-Site-Url' => home_url(),
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 15
     ]);
@@ -431,10 +411,10 @@ function ndzaipg_initiate_async_job($payload) {
 }
 
 // Helper function to poll job status
-function ndzaipg_poll_job_status($job_id) {
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+function aipg_poll_job_status($job_id) {
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
@@ -444,7 +424,7 @@ function ndzaipg_poll_job_status($job_id) {
         'timeout' => 30,
         'headers' => [
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ]
     ] );
 
@@ -468,10 +448,10 @@ function ndzaipg_poll_job_status($job_id) {
 }
 
 // 3. Check Intermediary API Connection
-function ndzaipg_check_api_connection() {
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+function aipg_check_api_connection() {
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
     
@@ -487,7 +467,7 @@ function ndzaipg_check_api_connection() {
         'timeout' => 10,
         'headers' => [
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ]
     ]);
 
@@ -514,12 +494,12 @@ function ndzaipg_check_api_connection() {
         
         // Handle Update Check
         if ( isset( $body['update'] ) && ! empty( $body['update'] ) ) {
-            update_option( 'ndzaipg_update_info', $body['update'] );
+            update_option( 'aipg_update_info', $body['update'] );
             // Force refresh WP update cache
             delete_site_transient( 'update_plugins' );
         } else {
-            if ( get_option( 'ndzaipg_update_info' ) ) {
-                delete_option( 'ndzaipg_update_info' );
+            if ( get_option( 'aipg_update_info' ) ) {
+                delete_option( 'aipg_update_info' );
                 delete_site_transient( 'update_plugins' );
             }
         }
@@ -551,7 +531,7 @@ function ndzaipg_check_api_connection() {
  * - Word counts
  * - Junk detection (unique character ratio and consecutive repeats)
  */
-function ndzaipg_validate_input($text, $type = 'new') {
+function aipg_validate_input($text, $type = 'new') {
     $text = trim((string)$text);
     $length = mb_strlen($text);
     $word_count = count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY));
@@ -596,20 +576,20 @@ function ndzaipg_validate_input($text, $type = 'new') {
  * Checks if the current user has permission to access the AI Generator based on saved settings.
  * Administrators ('manage_options') ALWAYS have access.
  */
-function ndzaipg_current_user_can_access() {
-    $cap = get_option( 'ndzaipg_access_capability', 'manage_options' );
+function aipg_current_user_can_access() {
+    $cap = get_option( 'aipg_access_capability', 'manage_options' );
     return current_user_can( $cap ) || current_user_can( 'manage_options' );
 }
 
 /**
  * Checks if the WordPress plugins directory is writable.
  */
-function ndzaipg_is_plugins_writable() {
+function aipg_is_plugins_writable() {
     return wp_is_writable( WP_PLUGIN_DIR );
 }
 
 // Helper function to get system info as an array for the AI prompt
-function ndzaipg_get_system_info_array() {
+function aipg_get_system_info_array() {
     global $wp_version;
 
     // Get Theme Info
@@ -637,7 +617,7 @@ function ndzaipg_get_system_info_array() {
     return [
         'wordpress_version' => $wp_version,
         'php_version' => phpversion(),
-        'plugin_version' => NDZAIPG_VERSION,
+        'plugin_version' => AIPG_VERSION,
         'active_theme' => [
             'name' => $current_theme->get('Name'),
             'version' => $current_theme->get('Version')
@@ -647,7 +627,7 @@ function ndzaipg_get_system_info_array() {
 }
 
 // Helper to parse Name and Version from plugin code
-function ndzaipg_parse_plugin_headers($code) {
+function aipg_parse_plugin_headers($code) {
     $headers = [
         'Name' => 'Plugin Name',
         'Version' => 'Version'
@@ -664,18 +644,18 @@ function ndzaipg_parse_plugin_headers($code) {
 }
 
 // 4. AJAX Handler for Modifying Plugins
-add_action( 'wp_ajax_ndzaipg_modify_plugin', 'ndzaipg_ajax_modify_plugin' );
-function ndzaipg_ajax_modify_plugin() {
+add_action( 'wp_ajax_aipg_modify_plugin', 'aipg_ajax_modify_plugin' );
+function aipg_ajax_modify_plugin() {
     ob_start();
-    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'ndzaipg_ajax_nonce' ) ) {
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'aipg_ajax_nonce' ) ) {
         wp_send_json_error( 'Invalid nonce.' );
     }
 
-    if ( ! ndzaipg_current_user_can_access() ) {
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( 'You do not have permission to modify plugins.' );
     }
 
-    if ( ! ndzaipg_is_plugins_writable() ) {
+    if ( ! aipg_is_plugins_writable() ) {
         wp_send_json_error( 'File system is not writable. Cannot update plugin.' );
     }
 
@@ -683,13 +663,13 @@ function ndzaipg_ajax_modify_plugin() {
     $modification_prompt = isset( $_POST['modification_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['modification_prompt'] ) ) : '';
 
     // Backend Validation
-    $validation_result = ndzaipg_validate_input($modification_prompt, 'mod');
+    $validation_result = aipg_validate_input($modification_prompt, 'mod');
     if ($validation_result !== true) {
         wp_send_json_error($validation_result);
     }
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
@@ -709,7 +689,7 @@ function ndzaipg_ajax_modify_plugin() {
     }
 
     $payload = [
-        'system_info' => ndzaipg_get_system_info_array(),
+        'system_info' => aipg_get_system_info_array(),
         'request_type' => 'modify_plugin',
         'project_id' => $plugin->external_project_id,
         'existing_code' => $plugin->code,
@@ -717,7 +697,7 @@ function ndzaipg_ajax_modify_plugin() {
     ];
 
     // Use the new async job executor to get job_id
-    $job_id_or_error = ndzaipg_initiate_async_job($payload);
+    $job_id_or_error = aipg_initiate_async_job($payload);
 
     if ( is_wp_error( $job_id_or_error ) ) {
         if ( $job_id_or_error->get_error_code() === 'legal_consent_required' ) {
@@ -737,14 +717,14 @@ function ndzaipg_ajax_modify_plugin() {
     ] );
 }
 
-add_action( 'wp_ajax_ndzaipg_check_modification_status', 'ndzaipg_ajax_check_modification_status' );
-function ndzaipg_ajax_check_modification_status() {
+add_action( 'wp_ajax_aipg_check_modification_status', 'aipg_ajax_check_modification_status' );
+function aipg_ajax_check_modification_status() {
     ob_start();
-    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'ndzaipg_ajax_nonce' ) ) {
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'aipg_ajax_nonce' ) ) {
         wp_send_json_error( 'Invalid nonce.' );
     }
 
-    if ( ! ndzaipg_current_user_can_access() ) {
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( 'Permission denied.' );
     }
 
@@ -755,7 +735,7 @@ function ndzaipg_ajax_check_modification_status() {
         wp_send_json_error( 'Missing parameters.' );
     }
 
-    $status_data = ndzaipg_poll_job_status($job_id);
+    $status_data = aipg_poll_job_status($job_id);
 
     if ( is_wp_error( $status_data ) ) {
         wp_send_json_error( $status_data->get_error_message() );
@@ -797,7 +777,7 @@ function ndzaipg_ajax_check_modification_status() {
         $active_version_remote_id = $status_data['version_id'] ?? '';
         $tokens_remaining = $status_data['tokens_remaining'] ?? null;
 
-        $headers = ndzaipg_parse_plugin_headers($modified_code);
+        $headers = aipg_parse_plugin_headers($modified_code);
         $new_name = !empty($headers['Name']) ? $headers['Name'] : $plugin->name;
         $new_version = !empty($headers['Version']) ? $headers['Version'] : '1.0.0';
 
@@ -833,7 +813,7 @@ function ndzaipg_ajax_check_modification_status() {
     }
 }
 // 5. Ensure database table exists
-function ndzaipg_ensure_table_exists() {
+function aipg_ensure_table_exists() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'ai_plugins';
     
@@ -841,12 +821,12 @@ function ndzaipg_ensure_table_exists() {
     // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
     if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table_name}'" ) !== $table_name ) {
         // phpcs:enable
-        ndzaipg_create_database_table();
+        aipg_create_database_table();
     } else {
         // Also check projects table
-        $table_projects = $wpdb->prefix . 'ndzaipg_projects';
+        $table_projects = $wpdb->prefix . 'aipg_projects';
         if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table_projects}'" ) !== $table_projects ) {
-            ndzaipg_create_database_table();
+            aipg_create_database_table();
         } else {
             // Table exists, check if new columns exist (simple migration check)
             // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
@@ -854,22 +834,22 @@ function ndzaipg_ensure_table_exists() {
             $column_v = $wpdb->get_results( "SHOW COLUMNS FROM {$table_name} LIKE 'version'" );
             // phpcs:enable
             if ( empty( $column ) || empty( $column_v ) ) {
-                ndzaipg_create_database_table();
+                aipg_create_database_table();
             }
         }
     }
 }
 
 // 5. Render License Screen
-function ndzaipg_render_license_screen($message = '') {
-    $current_key = get_option( 'ndzaipg_license_key', '' );
+function aipg_render_license_screen($message = '') {
+    $current_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $current_api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $current_api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     ?>
     <style>
         /* Force reset for our container */
-        .ndzaipg-license-container {
+        .aipg-license-container {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -881,7 +861,7 @@ function ndzaipg_render_license_screen($message = '') {
             position: relative !important;
             z-index: 9999 !important;
         }
-        .ndzaipg-license-card {
+        .aipg-license-card {
             background: #ffffff !important;
             padding: 64px 48px !important;
             border-radius: 32px !important;
@@ -893,7 +873,7 @@ function ndzaipg_render_license_screen($message = '') {
             border: 1px solid rgba(0,0,0,0.08) !important;
             margin: auto !important;
         }
-        .ndzaipg-license-title {
+        .aipg-license-title {
             font-size: 28px !important;
             font-weight: 400 !important;
             color: #1d1d1f !important;
@@ -901,18 +881,18 @@ function ndzaipg_render_license_screen($message = '') {
             letter-spacing: -0.02em !important;
             line-height: 1.2 !important;
         }
-        .ndzaipg-license-subtitle {
+        .aipg-license-subtitle {
             font-size: 15px !important;
             color: #86868b !important;
             margin: 0 0 40px !important;
             font-weight: 400 !important;
             line-height: 1.4 !important;
         }
-        .ndzaipg-form-group {
+        .aipg-form-group {
             text-align: left !important;
             margin-bottom: 24px !important;
         }
-        .ndzaipg-label {
+        .aipg-label {
             display: block !important;
             font-size: 10px !important;
             font-weight: 600 !important;
@@ -922,10 +902,10 @@ function ndzaipg_render_license_screen($message = '') {
             margin-bottom: 8px !important;
             padding-left: 4px !important;
         }
-        .ndzaipg-input-wrapper {
+        .aipg-input-wrapper {
             position: relative !important;
         }
-        input.ndzaipg-input {
+        input.aipg-input {
             width: 100% !important;
             padding: 16px 16px !important;
             font-size: 15px !important;
@@ -941,16 +921,16 @@ function ndzaipg_render_license_screen($message = '') {
             height: auto !important;
             line-height: normal !important;
         }
-        input.ndzaipg-input:focus {
+        input.aipg-input:focus {
             border-color: #0071e3 !important;
             background: #ffffff !important;
             outline: none !important;
             box-shadow: 0 0 0 4px rgba(0,113,227,0.12) !important;
         }
-        input.ndzaipg-input::placeholder {
+        input.aipg-input::placeholder {
             color: #a1a1a6 !important;
         }
-        button.ndzaipg-submit-btn {
+        button.aipg-submit-btn {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -969,26 +949,26 @@ function ndzaipg_render_license_screen($message = '') {
             height: auto !important;
             line-height: normal !important;
         }
-        button.ndzaipg-submit-btn:hover {
+        button.aipg-submit-btn:hover {
             background: #2e2e30 !important;
         }
-        button.ndzaipg-submit-btn:active {
+        button.aipg-submit-btn:active {
             transform: scale(0.98) !important;
         }
         /* Wordpress UI Overrides */
     #wpfooter { display: none !important; }
     .update-nag { display: none !important; }
     
-    .ndzaipg-dashboard-wrapper {
+    .aipg-dashboard-wrapper {
         margin: 0 -20px -65px -20px !important;
         padding: 40px !important;
         }
-        .ndzaipg-arrow {
+        .aipg-arrow {
             margin-left: 8px !important;
             font-size: 16px !important;
             line-height: 1 !important;
         }
-        a.ndzaipg-footer-link {
+        a.aipg-footer-link {
             display: block !important;
             margin-top: 24px !important;
             font-size: 13px !important;
@@ -998,10 +978,10 @@ function ndzaipg_render_license_screen($message = '') {
             font-weight: 500 !important;
             box-shadow: none !important;
         }
-        a.ndzaipg-footer-link:hover {
+        a.aipg-footer-link:hover {
             color: #1d1d1f !important;
         }
-        .ndzaipg-error-msg, .ndzaipg-updated-msg {
+        .aipg-error-msg, .aipg-updated-msg {
             padding: 14px 20px !important;
             border-radius: 12px !important;
             font-size: 14px !important;
@@ -1012,29 +992,29 @@ function ndzaipg_render_license_screen($message = '') {
             line-height: 1.4 !important;
             border: 1px solid transparent !important;
         }
-        .ndzaipg-error-msg {
+        .aipg-error-msg {
             background: #fff2f2 !important;
             color: #d70015 !important;
             border-color: #ffd6d6 !important;
         }
-        .ndzaipg-updated-msg {
+        .aipg-updated-msg {
             background: #f2faf2 !important;
             color: #008a00 !important;
             border-color: #d4edda !important;
         }
         /* Hide unwanted WP inputs if they leak */
-        .ndzaipg-license-card input[type=checkbox] { display: none !important; }
+        .aipg-license-card input[type=checkbox] { display: none !important; }
     </style>
     
-    <div class="ndzaipg-license-container">
-        <div class="ndzaipg-license-card">
-            <h1 class="ndzaipg-license-title"><?php esc_html_e( 'Hello again', 'ai-studio-generator' ); ?></h1>
-            <p class="ndzaipg-license-subtitle"><?php esc_html_e( 'Unlock your workspace to continue', 'ai-studio-generator' ); ?></p>
+    <div class="aipg-license-container">
+        <div class="aipg-license-card">
+            <h1 class="aipg-license-title"><?php esc_html_e( 'Hello again', 'ai-studio-generator' ); ?></h1>
+            <p class="aipg-license-subtitle"><?php esc_html_e( 'Unlock your workspace to continue', 'ai-studio-generator' ); ?></p>
             
             <?php if (!empty($message)) : 
                 $clean_message = wp_strip_all_tags($message);
                 $is_error = (strpos($message, 'updated') === false && strpos($message, 'saved') === false);
-                $msg_class = $is_error ? 'ndzaipg-error-msg' : 'ndzaipg-updated-msg';
+                $msg_class = $is_error ? 'aipg-error-msg' : 'aipg-updated-msg';
                 $icon = $is_error ? 'warning' : 'yes';
             ?>
                 <div class="<?php echo esc_attr($msg_class); ?>">
@@ -1044,30 +1024,30 @@ function ndzaipg_render_license_screen($message = '') {
             <?php endif; ?>
 
             <form method="post">
-                <?php wp_nonce_field( 'ndzaipg_settings', 'ndzaipg_s_nonce' ); ?>
+                <?php wp_nonce_field( 'aipg_settings', 'aipg_s_nonce' ); ?>
                 
-                <div class="ndzaipg-form-group">
-                    <label class="ndzaipg-label" for="ndzaipg_license_key"><?php esc_html_e( 'LICENSE KEY', 'ai-studio-generator' ); ?></label>
-                    <div class="ndzaipg-input-wrapper">
-                        <input type="password" name="ndzaipg_license_key" id="ndzaipg_license_key" class="ndzaipg-input" value="<?php echo esc_attr( $current_key ); ?>" placeholder="<?php esc_attr_e( 'Enter your license key', 'ai-studio-generator' ); ?>" required>
+                <div class="aipg-form-group">
+                    <label class="aipg-label" for="aipg_license_key"><?php esc_html_e( 'LICENSE KEY', 'ai-studio-generator' ); ?></label>
+                    <div class="aipg-input-wrapper">
+                        <input type="password" name="aipg_license_key" id="aipg_license_key" class="aipg-input" value="<?php echo esc_attr( $current_key ); ?>" placeholder="<?php esc_attr_e( 'Enter your license key', 'ai-studio-generator' ); ?>" required>
                     </div>
                 </div>
 
                 <?php // DEV-START ?>
-                <div class="ndzaipg-form-group">
-                     <label class="ndzaipg-label" for="ndzaipg_api_url">API URL <span style="font-weight:400; text-transform:none; color: #a1a1a6;">(Optional)</span></label>
-                     <div class="ndzaipg-input-wrapper">
-                        <input type="url" name="ndzaipg_api_url" id="ndzaipg_api_url" class="ndzaipg-input" value="<?php echo esc_attr( $current_api_url ); ?>" placeholder="http://host.docker.internal:8000/">
+                <div class="aipg-form-group">
+                     <label class="aipg-label" for="aipg_api_url">API URL <span style="font-weight:400; text-transform:none; color: #a1a1a6;">(Optional)</span></label>
+                     <div class="aipg-input-wrapper">
+                        <input type="url" name="aipg_api_url" id="aipg_api_url" class="aipg-input" value="<?php echo esc_attr( $current_api_url ); ?>" placeholder="http://host.docker.internal:8000/">
                      </div>
                 </div>
                 <?php // DEV-END ?>
 
-                <button type="submit" name="save_settings" class="ndzaipg-submit-btn">
-                    <?php esc_html_e( 'Sign In', 'ai-studio-generator' ); ?> <span class="ndzaipg-arrow">&rarr;</span>
+                <button type="submit" name="save_settings" class="aipg-submit-btn">
+                    <?php esc_html_e( 'Sign In', 'ai-studio-generator' ); ?> <span class="aipg-arrow">&rarr;</span>
                 </button>
 
                 <div style="text-align: center;">
-                    <a href="https://app.nodevzone.com" target="_blank" class="ndzaipg-footer-link"><?php esc_html_e( 'Creating a new account? Click here', 'ai-studio-generator' ); ?></a>
+                    <a href="https://app.nodevzone.com" target="_blank" class="aipg-footer-link"><?php esc_html_e( 'Creating a new account? Click here', 'ai-studio-generator' ); ?></a>
                 </div>
             </form>
         </div>
@@ -1075,48 +1055,48 @@ function ndzaipg_render_license_screen($message = '') {
     <?php
 }
 // 6. Main Render Function
-function ndzaipg_render_page() {
+function aipg_render_page() {
     // Ensure table exists before doing anything
-    ndzaipg_ensure_table_exists();
+    aipg_ensure_table_exists();
     
     $message = '';
     
     // Handle License Key Saving
-    if ( isset( $_POST['save_settings'] ) && isset( $_POST['ndzaipg_s_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ndzaipg_s_nonce'] ) ), 'ndzaipg_settings' ) ) {
+    if ( isset( $_POST['save_settings'] ) && isset( $_POST['aipg_s_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['aipg_s_nonce'] ) ), 'aipg_settings' ) ) {
         // DEV-START
-        if ( isset( $_POST['ndzaipg_api_url'] ) ) {
-            update_option( 'ndzaipg_api_url', esc_url_raw( wp_unslash( $_POST['ndzaipg_api_url'] ) ) );
+        if ( isset( $_POST['aipg_api_url'] ) ) {
+            update_option( 'aipg_api_url', esc_url_raw( wp_unslash( $_POST['aipg_api_url'] ) ) );
         }
         // DEV-END
-        if ( isset( $_POST['ndzaipg_license_key'] ) ) {
-            update_option( 'ndzaipg_license_key', sanitize_text_field( wp_unslash( $_POST['ndzaipg_license_key'] ) ) );
+        if ( isset( $_POST['aipg_license_key'] ) ) {
+            update_option( 'aipg_license_key', sanitize_text_field( wp_unslash( $_POST['aipg_license_key'] ) ) );
         }
         
-        if ( isset( $_POST['ndzaipg_access_capability'] ) ) {
-            $new_cap = sanitize_text_field( wp_unslash( $_POST['ndzaipg_access_capability'] ) );
+        if ( isset( $_POST['aipg_access_capability'] ) ) {
+            $new_cap = sanitize_text_field( wp_unslash( $_POST['aipg_access_capability'] ) );
             if ( ! empty( $new_cap ) ) {
-                update_option( 'ndzaipg_access_capability', $new_cap );
+                update_option( 'aipg_access_capability', $new_cap );
             }
         }
         $message = 'Settings saved.';
     }
 
-    $current_key = get_option( 'ndzaipg_license_key', '' );
+    $current_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $current_api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $current_api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
-    $current_cap = get_option( 'ndzaipg_access_capability', 'manage_options' );
+    $current_cap = get_option( 'aipg_access_capability', 'manage_options' );
 
     // If no license key, show license screen
     if ( empty( $current_key ) ) {
-        ndzaipg_render_license_screen($message);
+        aipg_render_license_screen($message);
         return;
     }
 
     // Check API connection
-    $api_status = ndzaipg_check_api_connection();
+    $api_status = aipg_check_api_connection();
     if ( ! $api_status['connected'] ) {
-        ndzaipg_render_license_screen( $api_status['message'] );
+        aipg_render_license_screen( $api_status['message'] );
         return;
     }
     
@@ -1133,21 +1113,21 @@ function ndzaipg_render_page() {
     ) );
 
     ?>
-    <div class="wrap ndzaipg-dashboard-wrapper">
-        <div class="ndzaipg-brand-header">
-            <h1 class="ndzaipg-page-title"><?php esc_html_e( 'AI Plugin Generator', 'ai-studio-generator' ); ?> <span class="ndzaipg-beta-badge"><?php esc_html_e( 'Beta', 'ai-studio-generator' ); ?></span></h1>
+    <div class="wrap aipg-dashboard-wrapper">
+        <div class="aipg-brand-header">
+            <h1 class="aipg-page-title"><?php esc_html_e( 'AI Plugin Generator', 'ai-studio-generator' ); ?> <span class="aipg-beta-badge"><?php esc_html_e( 'Beta', 'ai-studio-generator' ); ?></span></h1>
             <div style="display: flex; align-items: center; gap: 24px;">
-                <a href="https://app.nodevzone.com" target="_blank" class="ndzaipg-button-secondary" style="border-radius: 10px; font-weight: 600; padding: 8px 16px;"><?php esc_html_e( 'Go to dashboard', 'ai-studio-generator' ); ?></a>
-                <a href="https://www.nodevzone.com" target="_blank" class="ndzaipg-brand-link">
-                    <img src="<?php echo esc_url( plugins_url( 'logo60px.png', __FILE__ ) ); ?>" class="ndzaipg-brand-logo" alt="<?php esc_attr_e( 'NoDevZone Logo', 'ai-studio-generator' ); ?>">
-                    <div class="ndzaipg-brand-name"><span>No</span>Dev<span>Zone</span></div>
+                <a href="https://app.nodevzone.com" target="_blank" class="aipg-button-secondary" style="border-radius: 10px; font-weight: 600; padding: 8px 16px;"><?php esc_html_e( 'Go to dashboard', 'ai-studio-generator' ); ?></a>
+                <a href="https://www.nodevzone.com" target="_blank" class="aipg-brand-link">
+                    <img src="<?php echo esc_url( plugins_url( 'logo60px.png', __FILE__ ) ); ?>" class="aipg-brand-logo" alt="<?php esc_attr_e( 'NoDevZone Logo', 'ai-studio-generator' ); ?>">
+                    <div class="aipg-brand-name"><span>No</span>Dev<span>Zone</span></div>
                 </a>
             </div>
         </div>
         <?php if (!empty($message)) : 
             $clean_message = wp_strip_all_tags($message);
             $is_error = (strpos($message, 'updated') === false && strpos($message, 'saved') === false);
-            $msg_class = $is_error ? 'ndzaipg-error-msg' : 'ndzaipg-updated-msg';
+            $msg_class = $is_error ? 'aipg-error-msg' : 'aipg-updated-msg';
             $icon = $is_error ? 'warning' : 'yes';
         ?>
             <div class="<?php echo esc_attr($msg_class); ?>">
@@ -1158,8 +1138,8 @@ function ndzaipg_render_page() {
             </div>
         <?php endif; ?>
 
-        <?php if ( ! ndzaipg_is_plugins_writable() ) : ?>
-            <div class="ndzaipg-error-msg" style="margin-bottom: 24px; background: #fff2f2; border: 1px solid #ffcccc; color: #d70015; padding: 16px 24px; border-radius: 12px; display: flex; align-items: center;">
+        <?php if ( ! aipg_is_plugins_writable() ) : ?>
+            <div class="aipg-error-msg" style="margin-bottom: 24px; background: #fff2f2; border: 1px solid #ffcccc; color: #d70015; padding: 16px 24px; border-radius: 12px; display: flex; align-items: center;">
                 <span class="dashicons dashicons-warning" style="margin-right: 12px; font-size: 24px; width: 24px; height: 24px;"></span>
                 <div>
                     <strong style="display: block; font-size: 15px; margin-bottom: 4px;"><?php esc_html_e( 'Filesystem Not Writable', 'ai-studio-generator' ); ?></strong>
@@ -1170,10 +1150,10 @@ function ndzaipg_render_page() {
         <?php endif; ?>
 
         <?php 
-        $update_info = get_option( 'ndzaipg_update_info' );
-        if ( $update_info && version_compare( NDZAIPG_VERSION, $update_info['new_version'], '<' ) ) : 
+        $update_info = get_option( 'aipg_update_info' );
+        if ( $update_info && version_compare( AIPG_VERSION, $update_info['new_version'], '<' ) ) : 
         ?>
-            <div class="ndzaipg-error-msg" style="margin-bottom: 24px; background: #e5f1ff; border: 1px solid #b5d7ff; color: #007aff; padding: 16px 24px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="aipg-error-msg" style="margin-bottom: 24px; background: #e5f1ff; border: 1px solid #b5d7ff; color: #007aff; padding: 16px 24px; border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center;">
                     <span class="dashicons dashicons-update" style="margin-right: 12px; font-size: 24px; width: 24px; height: 24px;"></span>
                     <div>
@@ -1182,22 +1162,22 @@ function ndzaipg_render_page() {
                         <span style="font-size: 13px; opacity: 0.8;"><?php esc_html_e( 'A new version of AI Plugin Generator is available. Please update to get the latest features.', 'ai-studio-generator' ); ?></span>
                     </div>
                 </div>
-                <a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>" class="ndzaipg-button-primary" style="background: #007aff; border-color: #007aff; text-decoration: none;"><?php esc_html_e( 'Update Now', 'ai-studio-generator' ); ?></a>
+                <a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>" class="aipg-button-primary" style="background: #007aff; border-color: #007aff; text-decoration: none;"><?php esc_html_e( 'Update Now', 'ai-studio-generator' ); ?></a>
             </div>
         <?php endif; ?>
         
-        <div id="ndzaipg-low-token-warning" style="display: <?php echo ($api_status['connected'] && isset($api_status['tokens']) && $api_status['tokens'] < 2000) ? 'flex' : 'none'; ?>; align-items: center; justify-content: space-between; background: #fff5e5; border: 1px solid #ffebb5; color: #b97a08; padding: 16px 24px; border-radius: 16px; margin-bottom: 24px;">
+        <div id="aipg-low-token-warning" style="display: <?php echo ($api_status['connected'] && isset($api_status['tokens']) && $api_status['tokens'] < 2000) ? 'flex' : 'none'; ?>; align-items: center; justify-content: space-between; background: #fff5e5; border: 1px solid #ffebb5; color: #b97a08; padding: 16px 24px; border-radius: 16px; margin-bottom: 24px;">
             <div style="display: flex; align-items: center;">
                 <span class="dashicons dashicons-warning" style="font-size: 20px; width: 20px; height: 20px; margin-right: 12px; color: #f5a623;"></span>
                 <span style="font-weight: 500; font-size: 14px;"><strong><?php esc_html_e( 'Low Balance:', 'ai-studio-generator' ); ?></strong> <?php esc_html_e( 'You are running low on tokens.', 'ai-studio-generator' ); ?></span>
             </div>
-            <a href="https://app.nodevzone.com/tokens" target="_blank" class="ndzaipg-button-primary" style="background: #f5a623; border-color: #f5a623; min-width: auto; padding: 6px 16px; font-size: 13px;"><?php esc_html_e( 'Buy Tokens', 'ai-studio-generator' ); ?></a>
+            <a href="https://app.nodevzone.com/tokens" target="_blank" class="aipg-button-primary" style="background: #f5a623; border-color: #f5a623; min-width: auto; padding: 6px 16px; font-size: 13px;"><?php esc_html_e( 'Buy Tokens', 'ai-studio-generator' ); ?></a>
         </div>
 
-        <div class="ndzaipg-connection-card">
-            <div class="ndzaipg-connection-main">
+        <div class="aipg-connection-card">
+            <div class="aipg-connection-main">
                 <div style="display: flex; align-items: center;">
-                    <span class="ndzaipg-badge <?php echo $api_status['connected'] ? 'success' : 'error'; ?>">
+                    <span class="aipg-badge <?php echo $api_status['connected'] ? 'success' : 'error'; ?>">
                         <?php echo esc_html( $status_text ); ?>
                     </span>
                     <span style="margin-left: 12px; color: #6e6e73; font-size: 13px;">
@@ -1208,85 +1188,85 @@ function ndzaipg_render_page() {
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <?php if ( $api_status['connected'] && isset($api_status['tokens']) ) : 
                         $is_low = $api_status['tokens'] < 2000;
-                        $pill_class = $is_low ? 'ndzaipg-token-pill low-tokens' : 'ndzaipg-token-pill';
+                        $pill_class = $is_low ? 'aipg-token-pill low-tokens' : 'aipg-token-pill';
                     ?>
                     <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                     <div id="ndzaipg-token-container" class="<?php echo esc_attr($pill_class); ?>">
+                     <div id="aipg-token-container" class="<?php echo esc_attr($pill_class); ?>">
                              <span class="dashicons dashicons-database" style="font-size: 18px; width: 18px; height: 18px; opacity: 0.6;"></span>
-                             <span><span id="ndzaipg-token-count"><?php echo number_format($api_status['tokens']); ?></span> <?php esc_html_e( 'Tokens', 'ai-studio-generator' ); ?></span>
+                             <span><span id="aipg-token-count"><?php echo number_format($api_status['tokens']); ?></span> <?php esc_html_e( 'Tokens', 'ai-studio-generator' ); ?></span>
                         </div>
                         <?php if ( $api_status['tokens'] < 5000 ) : ?>
-                            <a href="https://app.nodevzone.com" target="_blank" class="ndzaipg-button-primary" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; text-transform: uppercase; background: #ff9500; border-color: #ff9500; color: #fff; box-shadow: 0 4px 12px rgba(255, 149, 0, 0.2);"><?php esc_html_e( 'Add new tokens', 'ai-studio-generator' ); ?></a>
+                            <a href="https://app.nodevzone.com" target="_blank" class="aipg-button-primary" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 8px; text-transform: uppercase; background: #ff9500; border-color: #ff9500; color: #fff; box-shadow: 0 4px 12px rgba(255, 149, 0, 0.2);"><?php esc_html_e( 'Add new tokens', 'ai-studio-generator' ); ?></a>
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
                 </div>
             </div>
             
-            <button type="button" class="ndzaipg-toggle-settings-btn" id="ndzaipg-toggle-settings" title="Toggle Settings">
+            <button type="button" class="aipg-toggle-settings-btn" id="aipg-toggle-settings" title="Toggle Settings">
                 <span class="dashicons dashicons-arrow-down-alt2" style="font-size: 16px; width: 16px; height: 16px;"></span>
                 <span class="dashicons dashicons-arrow-down-alt2" style="font-size: 16px; width: 16px; height: 16px; margin-top: -8px;"></span>
             </button>
         </div>
 
-        <div id="ndzaipg-settings-panel" class="ndzaipg-settings-panel">
+        <div id="aipg-settings-panel" class="aipg-settings-panel">
             <form method="post" style="display: flex; align-items: flex-end; gap: 24px; justify-content: space-between;">
-                <?php wp_nonce_field( 'ndzaipg_settings', 'ndzaipg_s_nonce' ); ?>
+                <?php wp_nonce_field( 'aipg_settings', 'aipg_s_nonce' ); ?>
                 
                 <?php // DEV-START ?>
                 <div style="flex-grow: 1;">
-                     <label class="ndzaipg-label"><?php esc_html_e( 'API URL', 'ai-studio-generator' ); ?></label>
-                     <input type="url" name="ndzaipg_api_url" value="<?php echo esc_attr( $current_api_url ); ?>" class="ndzaipg-input" placeholder="http://host.docker.internal:8000/">
+                     <label class="aipg-label"><?php esc_html_e( 'API URL', 'ai-studio-generator' ); ?></label>
+                     <input type="url" name="aipg_api_url" value="<?php echo esc_attr( $current_api_url ); ?>" class="aipg-input" placeholder="http://host.docker.internal:8000/">
                 </div>
                 <?php // DEV-END ?>
                 
                 <div style="flex-grow: 1;">
-                     <label class="ndzaipg-label"><?php esc_html_e( 'SaaS License / Gemini Key', 'ai-studio-generator' ); ?></label>
-                     <input type="password" name="ndzaipg_license_key" value="<?php echo esc_attr( $current_key ); ?>" class="ndzaipg-input">
+                     <label class="aipg-label"><?php esc_html_e( 'SaaS License / Gemini Key', 'ai-studio-generator' ); ?></label>
+                     <input type="password" name="aipg_license_key" value="<?php echo esc_attr( $current_key ); ?>" class="aipg-input">
                 </div>
 
                 <div style="flex-grow: 1;">
-                     <label class="ndzaipg-label"><?php esc_html_e( 'Minimum Access Level', 'ai-studio-generator' ); ?></label>
-                     <select name="ndzaipg_access_capability" class="ndzaipg-input" style="height: 38px;">
+                     <label class="aipg-label"><?php esc_html_e( 'Minimum Access Level', 'ai-studio-generator' ); ?></label>
+                     <select name="aipg_access_capability" class="aipg-input" style="height: 38px;">
                          <option value="manage_options" <?php selected($current_cap, 'manage_options'); ?>><?php esc_html_e( 'Administrator', 'ai-studio-generator' ); ?></option>
                          <option value="edit_pages" <?php selected($current_cap, 'edit_pages'); ?>><?php esc_html_e( 'Editor', 'ai-studio-generator' ); ?></option>
                          <option value="publish_posts" <?php selected($current_cap, 'publish_posts'); ?>><?php esc_html_e( 'Author', 'ai-studio-generator' ); ?></option>
                      </select>
                 </div>
                 
-                <button type="submit" name="save_settings" class="ndzaipg-button-secondary" style="margin-bottom: 1px;"><?php esc_html_e( 'Save', 'ai-studio-generator' ); ?></button>
+                <button type="submit" name="save_settings" class="aipg-button-secondary" style="margin-bottom: 1px;"><?php esc_html_e( 'Save', 'ai-studio-generator' ); ?></button>
             </form>
         </div>
-        <div class="ndzaipg-card" style="margin-top: 40px;">
+        <div class="aipg-card" style="margin-top: 40px;">
             <h2><?php esc_html_e( 'Generate New Plugin', 'ai-studio-generator' ); ?></h2>
-            <form id="ndzaipg-generate-form">
-                <div class="ndzaipg-form-group">
-                    <textarea name="plugin_prompt" id="plugin_prompt" class="ndzaipg-textarea" placeholder="<?php esc_attr_e( 'Describe your plugin (e.g., \'A plugin that adds a dark mode toggle to the footer\')', 'ai-studio-generator' ); ?>"></textarea>
-                    <div id="plugin_prompt_counter" class="ndzaipg-validation-counter">
+            <form id="aipg-generate-form">
+                <div class="aipg-form-group">
+                    <textarea name="plugin_prompt" id="plugin_prompt" class="aipg-textarea" placeholder="<?php esc_attr_e( 'Describe your plugin (e.g., \'A plugin that adds a dark mode toggle to the footer\')', 'ai-studio-generator' ); ?>"></textarea>
+                    <div id="plugin_prompt_counter" class="aipg-validation-counter">
                         <span class="v-msg"><?php esc_html_e( 'Min. 100 chars, 10 words', 'ai-studio-generator' ); ?></span>
                         <span class="v-stats">0 / 100 chars</span>
                     </div>
                 </div>
                 <div style="margin-top: 24px; text-align: right;">
-                    <input type="submit" id="ndzaipg-generate-submit" name="generate_plugin" class="ndzaipg-button-primary" value="<?php esc_attr_e( 'Generate & Install Plugin', 'ai-studio-generator' ); ?>" <?php disabled( ! ndzaipg_is_plugins_writable() ); ?>>
+                    <input type="submit" id="aipg-generate-submit" name="generate_plugin" class="aipg-button-primary" value="<?php esc_attr_e( 'Generate & Install Plugin', 'ai-studio-generator' ); ?>" <?php disabled( ! aipg_is_plugins_writable() ); ?>>
                 </div>
             </form>
             <div id="generation-status" style="margin-top: 20px;"></div>
         </div>
 
-        <div class="ndzaipg-card" id="ndzaipg-plugins-list-card">
+        <div class="aipg-card" id="aipg-plugins-list-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                 <div>
                     <h2 style="margin: 0;"><?php esc_html_e( 'Existing Plugins & Modifications', 'ai-studio-generator' ); ?></h2>
                     <p style="color: #6e6e73; margin: 4px 0 0;"><?php esc_html_e( 'Select a plugin below to view its code and make modifications using AI.', 'ai-studio-generator' ); ?></p>
                 </div>
-                <button type="button" id="sync-projects-btn" class="ndzaipg-button-secondary">
+                <button type="button" id="sync-projects-btn" class="aipg-button-secondary">
                     <span class="dashicons dashicons-update" style="margin-right: 8px; font-size: 18px; width: 18px; height: 18px;"></span>
                     <?php esc_html_e( 'Sync from AI Studio', 'ai-studio-generator' ); ?>
                 </button>
             </div>
             
-            <table class="ndzaipg-table">
+            <table class="aipg-table">
                 <thead>
                     <tr>
                         <th style="width: 40px;"><input type="checkbox" id="select-all-plugins"></th>
@@ -1299,17 +1279,17 @@ function ndzaipg_render_page() {
                         <th><?php esc_html_e( 'Actions', 'ai-studio-generator' ); ?></th>
                     </tr>
                 </thead>
-                <tbody id="ndzaipg-plugins-table-body">
+                <tbody id="aipg-plugins-table-body">
                     <?php if ( empty( $plugins ) ) : ?>
-                        <tr id="ndzaipg-no-plugins-row">
+                        <tr id="aipg-no-plugins-row">
                             <td colspan="8" style="padding: 40px; color: #86868b; font-style: italic;"><?php esc_html_e( 'No plugins generated yet. Describe your first plugin above to get started!', 'ai-studio-generator' ); ?></td>
                         </tr>
                     <?php endif; ?>
                     <?php foreach ( $plugins as $plugin ) : 
                         $is_installed = file_exists( WP_PLUGIN_DIR . '/' . $plugin->slug );
-                        $row_class = $is_installed ? '' : 'ndzaipg-remote-row';
+                        $row_class = $is_installed ? '' : 'aipg-remote-row';
                         if ($plugin->id == $highlight_id) {
-                            $row_class .= ' ndzaipg-row-highlight';
+                            $row_class .= ' aipg-row-highlight';
                         }
                     ?>
                     <tr class="<?php echo esc_attr(trim((string)$row_class)); ?>" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>" data-description="<?php echo esc_attr( $plugin->description ); ?>" data-project-id="<?php echo esc_attr( $plugin->external_project_id ); ?>" data-active-version-id="<?php echo esc_attr( $plugin->active_version_remote_id ); ?>">
@@ -1317,9 +1297,9 @@ function ndzaipg_render_page() {
                         <td><strong style="font-weight: 500; font-size: 15px;"><?php echo esc_html( $plugin->name ); ?></strong></td>
                         <td>
                             <?php if ( $is_installed ) : ?>
-                                <span class="ndzaipg-status-badge installed"><?php esc_html_e( 'Installed', 'ai-studio-generator' ); ?></span>
+                                <span class="aipg-status-badge installed"><?php esc_html_e( 'Installed', 'ai-studio-generator' ); ?></span>
                             <?php else : ?>
-                                <span class="ndzaipg-status-badge remote"><?php esc_html_e( 'Remote', 'ai-studio-generator' ); ?></span>
+                                <span class="aipg-status-badge remote"><?php esc_html_e( 'Remote', 'ai-studio-generator' ); ?></span>
                             <?php endif; ?>
                         </td>
                         <td><span style="background: #f2f2f5; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #666;"><?php echo esc_html( isset($plugin->version) ? $plugin->version : '1.0.0' ); ?></span></td>
@@ -1328,13 +1308,13 @@ function ndzaipg_render_page() {
                         <td style="color: #6e6e73; font-size: 13px;"><?php echo esc_html( date_format( date_create( $plugin->modified_at ), 'M d, Y' ) ); ?></td>
                         <td>
                             <?php if ( $is_installed ) : ?>
-                                <button type="button" class="ndzaipg-button-secondary view-code-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Code', 'ai-studio-generator' ); ?></button>
-                                <button type="button" class="ndzaipg-button-secondary view-history-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'History', 'ai-studio-generator' ); ?></button>
-                                <button type="button" class="ndzaipg-button-secondary modify-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Modify', 'ai-studio-generator' ); ?></button>
-                                <button type="button" class="ndzaipg-button-danger ndzaipg-delete-generated-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>" style="margin-left: 4px;"><?php esc_html_e( 'Delete', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-secondary view-code-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Code', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-secondary view-history-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'History', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-secondary modify-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Modify', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-danger aipg-delete-generated-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>" style="margin-left: 4px;"><?php esc_html_e( 'Delete', 'ai-studio-generator' ); ?></button>
                             <?php else : ?>
-                                <button type="button" class="ndzaipg-button-primary install-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Install', 'ai-studio-generator' ); ?></button>
-                                <button type="button" class="ndzaipg-button-secondary view-history-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'History', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-primary install-plugin-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'Install', 'ai-studio-generator' ); ?></button>
+                                <button type="button" class="aipg-button-secondary view-history-btn" data-plugin-id="<?php echo esc_attr( $plugin->id ); ?>"><?php esc_html_e( 'History', 'ai-studio-generator' ); ?></button>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -1344,16 +1324,16 @@ function ndzaipg_render_page() {
         </div>
 
             <!-- Modification Modal -->
-            <div id="modification-modal" class="ndzaipg-modal-overlay">
-                <div class="ndzaipg-modal">
-                    <div class="ndzaipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
+            <div id="modification-modal" class="aipg-modal-overlay">
+                <div class="aipg-modal">
+                    <div class="aipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
                         <div style="display: flex; align-items: center; gap: 40px;">
-                            <div class="ndzaipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
-                            <h3 class="ndzaipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Modify Plugin', 'ai-studio-generator' ); ?></h3>
+                            <div class="aipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
+                            <h3 class="aipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Modify Plugin', 'ai-studio-generator' ); ?></h3>
                         </div>
-                        <button type="button" class="ndzaipg-modal-close close-modal" data-target="#modification-modal" style="background: none; border: none; cursor: pointer; color: #86868b; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
+                        <button type="button" class="aipg-modal-close close-modal" data-target="#modification-modal" style="background: none; border: none; cursor: pointer; color: #86868b; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
                     </div>
-                    <div class="ndzaipg-modal-body">
+                    <div class="aipg-modal-body">
                         <div id="selected-plugin-info" style="margin-bottom: 16px; font-size: 14px;"></div>
                         
                         <div style="background: #f5f5f7; padding: 16px; margin-bottom: 20px; border-radius: 12px;">
@@ -1361,59 +1341,59 @@ function ndzaipg_render_page() {
                             <div id="last-prompt-display" style="color: #1d1d1f; font-size: 13px; white-space: pre-wrap; max-height: 100px; overflow-y: auto;"></div>
                         </div>
 
-                        <label for="modification-prompt" class="ndzaipg-label"><?php esc_html_e( 'New Instructions', 'ai-studio-generator' ); ?></label>
-                        <textarea id="modification-prompt" class="ndzaipg-textarea" style="height: 120px;" placeholder="<?php esc_attr_e( 'e.g., \'Add a settings page to the admin menu\' or \'Add a shortcode to display recent posts\'', 'ai-studio-generator' ); ?>"></textarea>
-                        <div id="modification_prompt_counter" class="ndzaipg-validation-counter">
+                        <label for="modification-prompt" class="aipg-label"><?php esc_html_e( 'New Instructions', 'ai-studio-generator' ); ?></label>
+                        <textarea id="modification-prompt" class="aipg-textarea" style="height: 120px;" placeholder="<?php esc_attr_e( 'e.g., \'Add a settings page to the admin menu\' or \'Add a shortcode to display recent posts\'', 'ai-studio-generator' ); ?>"></textarea>
+                        <div id="modification_prompt_counter" class="aipg-validation-counter">
                             <span class="v-msg"><?php esc_html_e( 'Min. 50 chars, 5 words', 'ai-studio-generator' ); ?></span>
                             <span class="v-stats">0 / 50 chars</span>
                         </div>
                         <div id="modification-status" style="margin-top: 16px;"></div>
                     </div>
-                    <div class="ndzaipg-modal-footer">
-                        <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#modification-modal" style="margin-right: 8px;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
-                        <button type="button" class="ndzaipg-button-primary" id="submit-modification" disabled <?php disabled( ! ndzaipg_is_plugins_writable() ); ?>><?php esc_html_e( 'Update Plugin', 'ai-studio-generator' ); ?></button>
+                    <div class="aipg-modal-footer">
+                        <button type="button" class="aipg-button-secondary close-modal" data-target="#modification-modal" style="margin-right: 8px;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
+                        <button type="button" class="aipg-button-primary" id="submit-modification" disabled <?php disabled( ! aipg_is_plugins_writable() ); ?>><?php esc_html_e( 'Update Plugin', 'ai-studio-generator' ); ?></button>
                     </div>
                 </div>
             </div>
             <!-- Code Viewer Modal -->
-            <div id="code-viewer-modal" class="ndzaipg-modal-overlay">
-                <div class="ndzaipg-modal" style="max-width: 900px; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
-                    <div class="ndzaipg-modal-header" style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 20px;">
+            <div id="code-viewer-modal" class="aipg-modal-overlay">
+                <div class="aipg-modal" style="max-width: 900px; background: #0f172a; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
+                    <div class="aipg-modal-header" style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 14px 20px;">
                         <div style="display: flex; align-items: center; gap: 50px;">
-                            <div class="ndzaipg-window-dots"></div>
-                            <h3 class="ndzaipg-modal-title" style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif;"><?php esc_html_e( 'Plugin Source Code', 'ai-studio-generator' ); ?></h3>
+                            <div class="aipg-window-dots"></div>
+                            <h3 class="aipg-modal-title" style="color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif;"><?php esc_html_e( 'Plugin Source Code', 'ai-studio-generator' ); ?></h3>
                         </div>
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            <button type="button" class="ndzaipg-copy-code-btn" id="ndzaipg-copy-code" title="<?php esc_attr_e( 'Copy to Clipboard', 'ai-studio-generator' ); ?>">
+                            <button type="button" class="aipg-copy-code-btn" id="aipg-copy-code" title="<?php esc_attr_e( 'Copy to Clipboard', 'ai-studio-generator' ); ?>">
                                 <span class="dashicons dashicons-clipboard"></span>
                                 <span class="copy-text"><?php esc_html_e( 'Copy', 'ai-studio-generator' ); ?></span>
                             </button>
-                            <button type="button" class="ndzaipg-modal-close close-modal" data-target="#code-viewer-modal" style="color: #94a3b8; background: none; border: none; cursor: pointer; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
+                            <button type="button" class="aipg-modal-close close-modal" data-target="#code-viewer-modal" style="color: #94a3b8; background: none; border: none; cursor: pointer; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
                         </div>
                     </div>
-                    <div class="ndzaipg-modal-body" style="padding: 0; background: transparent; overflow: hidden;">
-                        <div id="code-content" class="ndzaipg-code-block" style="border-radius: 0; border: none; max-height: 70vh; background: transparent;"></div>
+                    <div class="aipg-modal-body" style="padding: 0; background: transparent; overflow: hidden;">
+                        <div id="code-content" class="aipg-code-block" style="border-radius: 0; border: none; max-height: 70vh; background: transparent;"></div>
                     </div>
-                    <div class="ndzaipg-modal-footer" style="background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); padding: 16px 24px;">
-                        <button type="button" class="ndzaipg-button-primary" id="install-from-code-viewer" style="display: none; margin-right: 8px; background: #38bdf8; color: #0f172a; font-weight: 700;"><?php esc_html_e( 'Install Plugin', 'ai-studio-generator' ); ?></button>
-                        <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#code-viewer-modal" style="background: transparent; color: #94a3b8; border-color: rgba(255,255,255,0.1); font-weight: 600;"><?php esc_html_e( 'Close', 'ai-studio-generator' ); ?></button>
+                    <div class="aipg-modal-footer" style="background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.06); padding: 16px 24px;">
+                        <button type="button" class="aipg-button-primary" id="install-from-code-viewer" style="display: none; margin-right: 8px; background: #38bdf8; color: #0f172a; font-weight: 700;"><?php esc_html_e( 'Install Plugin', 'ai-studio-generator' ); ?></button>
+                        <button type="button" class="aipg-button-secondary close-modal" data-target="#code-viewer-modal" style="background: transparent; color: #94a3b8; border-color: rgba(255,255,255,0.1); font-weight: 600;"><?php esc_html_e( 'Close', 'ai-studio-generator' ); ?></button>
                     </div>
                 </div>
             </div>
 
             <!-- History Viewer Modal -->
-            <div id="history-viewer-modal" class="ndzaipg-modal-overlay">
-                <div class="ndzaipg-modal">
-                    <div class="ndzaipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
+            <div id="history-viewer-modal" class="aipg-modal-overlay">
+                <div class="aipg-modal">
+                    <div class="aipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
                         <div style="display: flex; align-items: center; gap: 40px;">
-                            <div class="ndzaipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
-                            <h3 class="ndzaipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Version History', 'ai-studio-generator' ); ?></h3>
+                            <div class="aipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
+                            <h3 class="aipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Version History', 'ai-studio-generator' ); ?></h3>
                         </div>
-                        <button type="button" class="ndzaipg-modal-close close-modal" data-target="#history-viewer-modal" style="background: none; border: none; cursor: pointer; color: #86868b; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
+                        <button type="button" class="aipg-modal-close close-modal" data-target="#history-viewer-modal" style="background: none; border: none; cursor: pointer; color: #86868b; padding: 4px;"><span class="dashicons dashicons-no-alt"></span></button>
                     </div>
-                    <div class="ndzaipg-modal-body">
+                    <div class="aipg-modal-body">
                         <div id="history-status"></div>
-                        <table class="ndzaipg-table" style="margin-top: 0;">
+                        <table class="aipg-table" style="margin-top: 0;">
                             <thead>
                                 <tr>
                                     <th><?php esc_html_e( 'Version', 'ai-studio-generator' ); ?></th>
@@ -1425,16 +1405,16 @@ function ndzaipg_render_page() {
                             <tbody id="history-content"></tbody>
                         </table>
                     </div>
-                    <div class="ndzaipg-modal-footer">
-                        <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#history-viewer-modal"><?php esc_html_e( 'Close', 'ai-studio-generator' ); ?></button>
+                    <div class="aipg-modal-footer">
+                        <button type="button" class="aipg-button-secondary close-modal" data-target="#history-viewer-modal"><?php esc_html_e( 'Close', 'ai-studio-generator' ); ?></button>
                     </div>
                 </div>
             </div>
 
             <!-- Confirmation Modal -->
-            <div id="confirmation-modal" class="ndzaipg-modal-overlay" style="z-index: 100000;">
-                <div class="ndzaipg-modal" style="max-width: 400px; text-align: center; border-radius: 24px; overflow: hidden;">
-                    <div class="ndzaipg-modal-body" style="padding: 32px;">
+            <div id="confirmation-modal" class="aipg-modal-overlay" style="z-index: 100000;">
+                <div class="aipg-modal" style="max-width: 400px; text-align: center; border-radius: 24px; overflow: hidden;">
+                    <div class="aipg-modal-body" style="padding: 32px;">
                         <div id="confirm-modal-icon-bg" style="background: #fff2f2; width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
                             <span class="dashicons dashicons-warning" id="confirm-modal-icon" style="color: #d70015; font-size: 24px; width: 24px; height: 24px;"></span>
                         </div>
@@ -1442,28 +1422,28 @@ function ndzaipg_render_page() {
                         <p id="confirm-modal-message" style="color: #86868b; font-size: 13px; margin: 0 0 32px;"><?php esc_html_e( 'This action cannot be undone.', 'ai-studio-generator' ); ?></p>
                         
                         <div style="display: flex; gap: 12px; justify-content: center;">
-                            <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#confirmation-modal" style="flex: 1;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
-                            <button type="button" class="ndzaipg-button-primary" id="confirm-modal-submit" style="flex: 1;"><?php esc_html_e( 'Confirm', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-secondary close-modal" data-target="#confirmation-modal" style="flex: 1;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-primary" id="confirm-modal-submit" style="flex: 1;"><?php esc_html_e( 'Confirm', 'ai-studio-generator' ); ?></button>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Legal Consent Modal -->
-            <div id="legal-consent-modal" class="ndzaipg-modal-overlay">
-                <div class="ndzaipg-modal" style="max-width: 600px;">
-                    <div class="ndzaipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
+            <div id="legal-consent-modal" class="aipg-modal-overlay">
+                <div class="aipg-modal" style="max-width: 600px;">
+                    <div class="aipg-modal-header" style="background: #fbfbfd; border-bottom: 1px solid #f0f0f0; padding: 18px 24px;">
                         <div style="display: flex; align-items: center; gap: 40px;">
-                            <div class="ndzaipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
-                            <h3 class="ndzaipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Legal Consent Required', 'ai-studio-generator' ); ?></h3>
+                            <div class="aipg-window-dots" style="filter: grayscale(1) opacity(0.25);"></div>
+                            <h3 class="aipg-modal-title" style="font-size: 14px; font-weight: 600; margin: 0; color: #1d1d1f;"><?php esc_html_e( 'Legal Consent Required', 'ai-studio-generator' ); ?></h3>
                         </div>
                     </div>
-                    <div class="ndzaipg-modal-body">
+                    <div class="aipg-modal-body">
                         <p style="margin-bottom: 20px; color: #6e6e73;"><?php esc_html_e( 'To continue using the AI Plugin Generator, please review and accept our latest Terms of Service and Privacy Policy.', 'ai-studio-generator' ); ?></p>
                         
                         <div id="legal-content-container" style="display: flex; flex-direction: column; gap: 20px;">
                             <div id="tos-section" style="display: none;">
-                                <h4 style="margin: 0 0 10px;"><?php esc_html_e( 'Terms of Service', 'ai-studio-generator' ); ?> <span class="ndzaipg-beta-badge" id="tos-version"></span></h4>
+                                <h4 style="margin: 0 0 10px;"><?php esc_html_e( 'Terms of Service', 'ai-studio-generator' ); ?> <span class="aipg-beta-badge" id="tos-version"></span></h4>
                                 <div id="tos-content" style="max-height: 200px; overflow-y: auto; padding: 15px; background: #fbfbfd; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px;"></div>
                                 <label style="display: flex; align-items: center; margin-top: 10px; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" id="tos-checkbox" class="legal-checkbox">
@@ -1472,7 +1452,7 @@ function ndzaipg_render_page() {
                             </div>
 
                             <div id="privacy-policy-section" style="display: none;">
-                                <h4 style="margin: 0 0 10px;"><?php esc_html_e( 'Privacy Policy', 'ai-studio-generator' ); ?> <span class="ndzaipg-beta-badge" id="pp-version"></span></h4>
+                                <h4 style="margin: 0 0 10px;"><?php esc_html_e( 'Privacy Policy', 'ai-studio-generator' ); ?> <span class="aipg-beta-badge" id="pp-version"></span></h4>
                                 <div id="pp-content" style="max-height: 200px; overflow-y: auto; padding: 15px; background: #fbfbfd; border: 1px solid #d2d2d7; border-radius: 8px; font-size: 13px;"></div>
                                 <label style="display: flex; align-items: center; margin-top: 10px; gap: 8px; cursor: pointer;">
                                     <input type="checkbox" id="pp-checkbox" class="legal-checkbox">
@@ -1483,16 +1463,16 @@ function ndzaipg_render_page() {
 
                         <div id="legal-status" style="margin-top: 16px;"></div>
                     </div>
-                    <div class="ndzaipg-modal-footer">
-                        <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#legal-consent-modal" style="margin-right: 8px;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
-                        <button type="button" class="ndzaipg-button-primary" id="submit-legal-consent" disabled><?php esc_html_e( 'Accept & Continue', 'ai-studio-generator' ); ?></button>
+                    <div class="aipg-modal-footer">
+                        <button type="button" class="aipg-button-secondary close-modal" data-target="#legal-consent-modal" style="margin-right: 8px;"><?php esc_html_e( 'Cancel', 'ai-studio-generator' ); ?></button>
+                        <button type="button" class="aipg-button-primary" id="submit-legal-consent" disabled><?php esc_html_e( 'Accept & Continue', 'ai-studio-generator' ); ?></button>
                     </div>
                 </div>
             </div>
             <!-- Success Modal -->
-            <div id="post-generation-modal" class="ndzaipg-modal-overlay" style="z-index: 100000;">
-                <div class="ndzaipg-modal" style="max-width: 700px; text-align: center; border-radius: 24px; overflow: visible;">
-                    <div class="ndzaipg-modal-body" style="padding: 40px 48px;">
+            <div id="post-generation-modal" class="aipg-modal-overlay" style="z-index: 100000;">
+                <div class="aipg-modal" style="max-width: 700px; text-align: center; border-radius: 24px; overflow: visible;">
+                    <div class="aipg-modal-body" style="padding: 40px 48px;">
                         <div style="background: #e1f5fe; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
                             <span class="dashicons dashicons-yes-alt" style="color: #03a9f4; font-size: 32px; width: 32px; height: 32px;"></span>
                         </div>
@@ -1502,28 +1482,28 @@ function ndzaipg_render_page() {
                         printf( esc_html__( 'Your new plugin "%s" is ready in your AI Hub.', 'ai-studio-generator' ), '<strong><span id="new-plugin-name-display"></span></strong>' ); 
                         ?></p>
                         
-                        <h4 id="ndzaipg-scan-header" style="margin: 0 0 16px; font-size: 13px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.05em; display: none;"><?php esc_html_e( 'Scan Results', 'ai-studio-generator' ); ?></h4>
-                        <div id="ndzaipg-scan-results-container" class="ndzaipg-scan-results" style="display: none; margin-bottom: 32px;"></div>
+                        <h4 id="aipg-scan-header" style="margin: 0 0 16px; font-size: 13px; font-weight: 600; color: #86868b; text-transform: uppercase; letter-spacing: 0.05em; display: none;"><?php esc_html_e( 'Scan Results', 'ai-studio-generator' ); ?></h4>
+                        <div id="aipg-scan-results-container" class="aipg-scan-results" style="display: none; margin-bottom: 32px;"></div>
 
                         <p style="color: #6e6e73; font-size: 15px; margin: 0 0 32px; line-height: 1.5;"><?php esc_html_e( 'What would you like to do next?', 'ai-studio-generator' ); ?></p>
                         
                         <div style="display: flex; gap: 12px; margin-top: 12px;">
-                            <button type="button" class="ndzaipg-button-danger" id="gen-action-install-activate" style="flex: 1.2; height: 52px; font-size: 15px; font-weight: 700; border-radius: 14px; box-shadow: 0 4px 12px rgba(215, 0, 21, 0.15);"><?php esc_html_e( 'Install & Activate', 'ai-studio-generator' ); ?></button>
-                            <button type="button" class="ndzaipg-button-primary" id="gen-action-install" style="flex: 1; height: 52px; font-size: 15px; font-weight: 600; border-radius: 14px;"><?php esc_html_e( 'Install Now', 'ai-studio-generator' ); ?></button>
-                            <button type="button" class="ndzaipg-button-secondary" id="gen-action-review" style="flex: 1; height: 52px; font-size: 15px; font-weight: 600; border-radius: 14px;"><?php esc_html_e( 'Review Code', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-danger" id="gen-action-install-activate" style="flex: 1.2; height: 52px; font-size: 15px; font-weight: 700; border-radius: 14px; box-shadow: 0 4px 12px rgba(215, 0, 21, 0.15);"><?php esc_html_e( 'Install & Activate', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-primary" id="gen-action-install" style="flex: 1; height: 52px; font-size: 15px; font-weight: 600; border-radius: 14px;"><?php esc_html_e( 'Install Now', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-secondary" id="gen-action-review" style="flex: 1; height: 52px; font-size: 15px; font-weight: 600; border-radius: 14px;"><?php esc_html_e( 'Review Code', 'ai-studio-generator' ); ?></button>
                         </div>
                         <div style="margin-top: 20px;">
-                            <button type="button" class="ndzaipg-button-secondary close-modal" data-target="#post-generation-modal" style="border: none; background: transparent; color: #86868b; font-size: 14px; font-weight: 500;"><?php esc_html_e( 'Maybe Later (Close)', 'ai-studio-generator' ); ?></button>
+                            <button type="button" class="aipg-button-secondary close-modal" data-target="#post-generation-modal" style="border: none; background: transparent; color: #86868b; font-size: 14px; font-weight: 500;"><?php esc_html_e( 'Maybe Later (Close)', 'ai-studio-generator' ); ?></button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="ndzaipg-footer">
-                <div class="ndzaipg-footer-copyright">
+            <div class="aipg-footer">
+                <div class="aipg-footer-copyright">
                     &copy; <?php echo esc_html( date( 'Y' ) ); ?> AI Studio Generator. <?php esc_html_e( 'All rights reserved.', 'ai-studio-generator' ); ?>
                 </div>
-                <div class="ndzaipg-footer-version">
-                    v<?php echo esc_html( NDZAIPG_VERSION ); ?>
+                <div class="aipg-footer-version">
+                    v<?php echo esc_html( AIPG_VERSION ); ?>
                 </div>
             </div>
         </div>
@@ -1532,10 +1512,10 @@ function ndzaipg_render_page() {
 
 <?php }
 // 7. AJAX Handler for Getting Plugin Code
-add_action( 'wp_ajax_ndzaipg_get_plugin_code', 'ndzaipg_get_plugin_code' );
-function ndzaipg_get_plugin_code() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_get_plugin_code', 'aipg_get_plugin_code' );
+function aipg_get_plugin_code() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
@@ -1552,16 +1532,16 @@ function ndzaipg_get_plugin_code() {
 
     // If no code in DB, try to fetch from remote latest version
     if ( empty( $code ) && ! empty( $plugin->active_version_remote_id ) ) {
-        $license_key = get_option( 'ndzaipg_license_key', '' );
+        $license_key = get_option( 'aipg_license_key', '' );
         // DEV-START
-        $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+        $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
         // DEV-END
         // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
         
         $response = wp_remote_get( rtrim( $api_url, '/' ) . "/api/versions/" . $plugin->active_version_remote_id . "/code", [
             'headers' => [ 
                 'X-License-Key' => $license_key,
-                'X-Plugin-Version' => NDZAIPG_VERSION
+                'X-Plugin-Version' => AIPG_VERSION
             ],
             'timeout' => 15
         ]);
@@ -1580,10 +1560,10 @@ function ndzaipg_get_plugin_code() {
 }
 
 // 8. AJAX Handler for Testing API
-add_action( 'wp_ajax_ndzaipg_test_api', 'ndzaipg_ajax_test_api' );
-function ndzaipg_ajax_test_api() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    $result = ndzaipg_check_api_connection();
+add_action( 'wp_ajax_aipg_test_api', 'aipg_ajax_test_api' );
+function aipg_ajax_test_api() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    $result = aipg_check_api_connection();
     if ( $result['connected'] ) {
         wp_send_json_success( $result['message'] );
     } else {
@@ -1592,41 +1572,41 @@ function ndzaipg_ajax_test_api() {
 }
 
 // 9. AJAX Handler for Generating Plugin
-add_action( 'wp_ajax_ndzaipg_generate_plugin', 'ndzaipg_ajax_generate_plugin' );
-function ndzaipg_ajax_generate_plugin() {
+add_action( 'wp_ajax_aipg_generate_plugin', 'aipg_ajax_generate_plugin' );
+function aipg_ajax_generate_plugin() {
     ob_start();
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
 
-    if ( ! ndzaipg_current_user_can_access() ) {
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
-    if ( ! ndzaipg_is_plugins_writable() ) {
+    if ( ! aipg_is_plugins_writable() ) {
         wp_send_json_error( esc_html__( 'Plugins directory is not writable.', 'ai-studio-generator' ) );
     }
 
     $prompt = isset( $_POST['plugin_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['plugin_prompt'] ) ) : '';
     
     // Server-side validation
-    $validation_result = ndzaipg_validate_input($prompt);
+    $validation_result = aipg_validate_input($prompt);
     if ($validation_result !== true) {
         wp_send_json_error($validation_result);
     }
     
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
     $payload = [
-        'system_info' => ndzaipg_get_system_info_array(),
+        'system_info' => aipg_get_system_info_array(),
         'request_type' => 'create_plugin',
         'user_prompt' => $prompt
     ];
 
     // Use the new async job executor to get job_id
-    $job_id_or_error = ndzaipg_initiate_async_job($payload);
+    $job_id_or_error = aipg_initiate_async_job($payload);
 
     if ( is_wp_error( $job_id_or_error ) ) {
         if ( $job_id_or_error->get_error_code() === 'legal_consent_required' ) {
@@ -1646,12 +1626,12 @@ function ndzaipg_ajax_generate_plugin() {
     ] );
 }
 
-add_action( 'wp_ajax_ndzaipg_check_generation_status', 'ndzaipg_ajax_check_generation_status' );
-function ndzaipg_ajax_check_generation_status() {
+add_action( 'wp_ajax_aipg_check_generation_status', 'aipg_ajax_check_generation_status' );
+function aipg_ajax_check_generation_status() {
     ob_start();
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
 
-    if ( ! ndzaipg_current_user_can_access() ) {
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
@@ -1662,7 +1642,7 @@ function ndzaipg_ajax_check_generation_status() {
         wp_send_json_error( 'Missing job_id.' );
     }
 
-    $status_data = ndzaipg_poll_job_status($job_id);
+    $status_data = aipg_poll_job_status($job_id);
 
     if ( is_wp_error( $status_data ) ) {
         wp_send_json_error( $status_data->get_error_message() );
@@ -1689,7 +1669,7 @@ function ndzaipg_ajax_check_generation_status() {
         }
 
         // Parse headers to get name and version
-        $headers = ndzaipg_parse_plugin_headers($raw_code);
+        $headers = aipg_parse_plugin_headers($raw_code);
         $plugin_name = !empty($headers['Name']) ? $headers['Name'] : 'AI Generated Plugin';
         $plugin_version = !empty($headers['Version']) ? $headers['Version'] : '1.0.0';
 
@@ -1744,10 +1724,10 @@ function ndzaipg_ajax_check_generation_status() {
 }
 
 // 6. AI Studio - Prototype Generation Handlers
-add_action( 'wp_ajax_ndzaipg_generate_studio_prototype', 'ndzaipg_ajax_generate_studio_prototype' );
-function ndzaipg_ajax_generate_studio_prototype() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_generate_studio_prototype', 'aipg_ajax_generate_studio_prototype' );
+function aipg_ajax_generate_studio_prototype() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $template_name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : '';
     $prototype_prompt = isset( $_POST['prototype_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prototype_prompt'] ) ) : '';
@@ -1758,7 +1738,7 @@ function ndzaipg_ajax_generate_studio_prototype() {
     $palette = isset( $_POST['palette'] ) ? (array) $_POST['palette'] : [];
     $model_tier = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'claude_sonnet';
 
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-prototype';
 
     $response = wp_remote_post( $endpoint, [
@@ -1800,17 +1780,17 @@ function ndzaipg_ajax_generate_studio_prototype() {
     wp_send_json_success( $data );
 }
 
-add_action( 'wp_ajax_ndzaipg_check_studio_generation_status', 'ndzaipg_ajax_check_studio_generation_status' );
-function ndzaipg_ajax_check_studio_generation_status() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_check_studio_generation_status', 'aipg_ajax_check_studio_generation_status' );
+function aipg_ajax_check_studio_generation_status() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $job_id = isset( $_POST['job_id'] ) ? sanitize_text_field( wp_unslash( $_POST['job_id'] ) ) : '';
     if ( empty( $job_id ) ) {
         wp_send_json_error( 'Missing job_id.' );
     }
 
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $job_id . '?t=' . time();
 
     $response = wp_remote_get( $endpoint, [
@@ -1834,7 +1814,7 @@ function ndzaipg_ajax_check_studio_generation_status() {
 /**
  * Rewrites internal links within Studio generated content to point to unique slugs.
  */
-function ndzaipg_rewrite_studio_links( $content, $slug_map ) {
+function aipg_rewrite_studio_links( $content, $slug_map ) {
     if ( empty( $slug_map ) || empty( $content ) ) {
         return $content;
     }
@@ -1861,10 +1841,10 @@ function ndzaipg_rewrite_studio_links( $content, $slug_map ) {
     return $content;
 }
 
-add_action( 'wp_ajax_ndzaipg_install_prototype', 'ndzaipg_ajax_install_prototype' );
-function ndzaipg_ajax_install_prototype() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_install_prototype', 'aipg_ajax_install_prototype' );
+function aipg_ajax_install_prototype() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     // Increase time limit for the heavy installation process (FSE operations, multiple pages)
     set_time_limit( 300 ); 
@@ -1872,7 +1852,7 @@ function ndzaipg_ajax_install_prototype() {
     $raw_response = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $layout_id    = isset( $_POST['layout_id'] ) ? sanitize_text_field( wp_unslash( $_POST['layout_id'] ) ) : '';
     $project_id   = $layout_id; // Normalize for internal use
-    $theme_strategy = isset( $_POST['theme_strategy'] ) ? sanitize_text_field( $_POST['theme_strategy'] ) : get_option( 'ndzaipg_studio_theme_strategy', 'blank_theme' );
+    $theme_strategy = isset( $_POST['theme_strategy'] ) ? sanitize_text_field( $_POST['theme_strategy'] ) : get_option( 'aipg_studio_theme_strategy', 'blank_theme' );
     $data = json_decode( $raw_response, true );
 
     if ( ! $data || ! isset( $data['pages'] ) ) {
@@ -1899,7 +1879,7 @@ function ndzaipg_ajax_install_prototype() {
         $content    = isset($page_data['content']) ? $page_data['content'] : ''; // GPT/Claude block grammar
 
         // Rewriting internal links so they point to the correct layout variant
-        $content = ndzaipg_rewrite_studio_links( $content, $slug_map );
+        $content = aipg_rewrite_studio_links( $content, $slug_map );
 
         // GUARDRAIL: Strip any template-part blocks
         $content = preg_replace('/<!--\s*wp:template-part\s*{[^}]*"slug":"(header|footer)"[^}]*}\s*\/-->/i', '', $content);
@@ -1940,12 +1920,12 @@ function ndzaipg_ajax_install_prototype() {
             if ( strtolower($orig_slug) === 'home' || $home_page_id === 0 ) {
                 $home_page_id = $post_id;
             }
-            update_post_meta( $post_id, '_ndzaipg_studio_page', '1' );
+            update_post_meta( $post_id, '_aipg_studio_page', '1' );
             if ( ! empty($project_id) ) {
-                update_post_meta( $post_id, '_ndzaipg_project_id', $project_id );
+                update_post_meta( $post_id, '_aipg_project_id', $project_id );
             }
             if ( ! empty($layout_id) ) {
-                update_post_meta( $post_id, '_ndzaipg_layout_id', $layout_id );
+                update_post_meta( $post_id, '_aipg_layout_id', $layout_id );
             }
         }
     }
@@ -1959,7 +1939,7 @@ function ndzaipg_ajax_install_prototype() {
     // 4. Save to Projects Library (so it shows as 'Installed')
     if ( ! empty( $layout_id ) ) {
         global $wpdb;
-        $table_projects = $wpdb->prefix . 'ndzaipg_projects';
+        $table_projects = $wpdb->prefix . 'aipg_projects';
         
         // Check if already registered to avoid duplicates
         $exists = $wpdb->get_var( $wpdb->prepare( 
@@ -2003,7 +1983,7 @@ function ndzaipg_ajax_install_prototype() {
         foreach ( $data['template_parts'] as $part_data ) {
             $orig_slug = sanitize_title( $part_data['slug'] );
             $final_slug = $layout_id ? "{$orig_slug}-{$layout_id}" : $orig_slug;
-            $content = ndzaipg_rewrite_studio_links( $part_data['content'], $slug_map );
+            $content = aipg_rewrite_studio_links( $part_data['content'], $slug_map );
             $title = ucfirst($orig_slug) . ($layout_id ? " ({$layout_id})" : "");
             error_log("[AI Studio] Processing part slug: {$final_slug}");
 
@@ -2057,38 +2037,38 @@ function ndzaipg_ajax_install_prototype() {
                 // Ensure taxonomy is set correctly regardless of user permissions/context
                 wp_set_object_terms( $part_id, $target_theme, 'wp_theme' );
                 wp_set_object_terms( $part_id, $area, 'wp_template_part_area' );
-                update_post_meta( $part_id, '_ndzaipg_studio_page', '1' );
+                update_post_meta( $part_id, '_aipg_studio_page', '1' );
                 if ( ! empty($layout_id) ) {
-                    update_post_meta( $part_id, '_ndzaipg_layout_id', $layout_id );
+                    update_post_meta( $part_id, '_aipg_layout_id', $layout_id );
                 }
             }
         }
     }
 
     if ( ! empty($project_id) ) {
-         update_option( 'ndzaipg_studio_active_project', $project_id );
+         update_option( 'aipg_studio_active_project', $project_id );
     }
 
     // Update the active layout ID so FSE overrides know which parts to prioritize
     if ( ! empty($layout_id) ) {
-        update_option( 'ndzaipg_active_layout_id', $layout_id );
+        update_option( 'aipg_active_layout_id', $layout_id );
     }
 
     // Store theme tokens if provided
     if ( isset( $data['theme_json'] ) && !empty($data['theme_json'])) {
         error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
-        update_option( 'ndzaipg_studio_theme_config', $data['theme_json'] );
+        update_option( 'aipg_studio_theme_config', $data['theme_json'] );
     }
 
     // Store Custom CSS if provided
     if ( isset( $data['custom_css'] ) ) {
-        update_option( 'ndzaipg_studio_custom_css', $data['custom_css'] );
+        update_option( 'aipg_studio_custom_css', $data['custom_css'] );
     } else {
-        delete_option( 'ndzaipg_studio_custom_css' );
+        delete_option( 'aipg_studio_custom_css' );
     }
 
     // Handle Theme Strategy
-    update_option( 'ndzaipg_studio_theme_strategy', $theme_strategy );
+    update_option( 'aipg_studio_theme_strategy', $theme_strategy );
     
     if ( $theme_strategy === 'blank_theme' ) {
         $theme_dir = get_theme_root() . '/wpgenerator-blank';
@@ -2136,30 +2116,30 @@ function ndzaipg_ajax_install_prototype() {
 
     wp_send_json_success([
         'message'     => 'Real Gutenberg pages installed!',
-        'preview_url' => add_query_arg( '_ndzaipg_preview', $layout_id ?: time(), home_url('/') )
+        'preview_url' => add_query_arg( '_aipg_preview', $layout_id ?: time(), home_url('/') )
     ]);
 }
 
 /**
  * Override FSE Template Parts with AI Studio parts
  */
-add_filter( 'get_block_template', 'ndzaipg_override_fse_template_parts', 10, 3 );
-function ndzaipg_override_fse_template_parts( $block_template, $id, $template_type ) {
+add_filter( 'get_block_template', 'aipg_override_fse_template_parts', 10, 3 );
+function aipg_override_fse_template_parts( $block_template, $id, $template_type ) {
     $active_theme = wp_get_theme()->get_stylesheet();
 
     // 1. Full Page Overrides
     if ( $template_type === 'wp_template' ) {
         // If we are currently querying one of our AI-generated pages
         $post_id = get_queried_object_id();
-        $is_ai = $post_id ? get_post_meta( $post_id, '_ndzaipg_studio_page', true ) : false;
+        $is_ai = $post_id ? get_post_meta( $post_id, '_aipg_studio_page', true ) : false;
         error_log("[AI Studio Template] Checking wp_template override for ID: {$id}. Object ID: " . ($post_id ?: 'NONE') . ". Is AI: " . ($is_ai ? 'YES' : 'NO'));
         
         if ( $post_id && $is_ai ) {
             if ( ! $block_template ) {
                 $block_template = new WP_Block_Template();
-                $block_template->id = $active_theme . '//ndzaipg-blank';
+                $block_template->id = $active_theme . '//aipg-blank';
                 $block_template->theme = $active_theme;
-                $block_template->slug = 'ndzaipg-blank';
+                $block_template->slug = 'aipg-blank';
                 $block_template->source = 'custom';
                 $block_template->type = 'wp_template';
             }
@@ -2191,7 +2171,7 @@ function ndzaipg_override_fse_template_parts( $block_template, $id, $template_ty
 
     // Determine the Layout ID context
     $post_id   = get_queried_object_id();
-    $layout_id = $post_id ? get_post_meta( $post_id, '_ndzaipg_layout_id', true ) : get_option( 'ndzaipg_active_layout_id', '' );
+    $layout_id = $post_id ? get_post_meta( $post_id, '_aipg_layout_id', true ) : get_option( 'aipg_active_layout_id', '' );
 
     // Normalize slug to catch variations like 'footer-default' or 'header-dark'
     $search_slug = $slug;
@@ -2268,8 +2248,8 @@ function ndzaipg_override_fse_template_parts( $block_template, $id, $template_ty
 /**
  * Secondary override: Force render the AI Studio template parts during block rendering
  */
-add_filter( 'render_block_core/template-part', 'ndzaipg_force_render_template_part', 10, 2 );
-function ndzaipg_force_render_template_part( $block_content, $block ) {
+add_filter( 'render_block_core/template-part', 'aipg_force_render_template_part', 10, 2 );
+function aipg_force_render_template_part( $block_content, $block ) {
     $slug = isset( $block['attrs']['slug'] ) ? $block['attrs']['slug'] : '';
     if ( empty( $slug ) ) {
         return $block_content;
@@ -2279,7 +2259,7 @@ function ndzaipg_force_render_template_part( $block_content, $block ) {
 
     // Determine the Layout ID context
     $post_id   = get_queried_object_id();
-    $layout_id = $post_id ? get_post_meta( $post_id, '_ndzaipg_layout_id', true ) : get_option( 'ndzaipg_active_layout_id', '' );
+    $layout_id = $post_id ? get_post_meta( $post_id, '_aipg_layout_id', true ) : get_option( 'aipg_active_layout_id', '' );
 
     // Normalize slug
     $search_slug = $slug;
@@ -2338,7 +2318,7 @@ function ndzaipg_force_render_template_part( $block_content, $block ) {
         // Wrap in a semantic tag with a tracking class so the frontend can detect the atomic unit
         $tag = ( strpos( $slug, 'footer' ) !== false ) ? 'footer' : ( ( strpos( $slug, 'header' ) !== false ) ? 'header' : 'div' );
         $attrs = $block['attrs'] ?? [];
-        $class_str = "wp-block-template-part ndzaipg-part-{$slug}";
+        $class_str = "wp-block-template-part aipg-part-{$slug}";
         
         return "<{$tag} class=\"{$class_str}\">{$inner_html}</{$tag}>";
     }
@@ -2349,17 +2329,17 @@ function ndzaipg_force_render_template_part( $block_content, $block ) {
 /**
  * AJAX Handler for Saving Studio Projects
  */
-add_action( 'wp_ajax_ndzaipg_save_studio_project', 'ndzaipg_ajax_save_studio_project' );
-function ndzaipg_ajax_save_studio_project() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_save_studio_project', 'aipg_ajax_save_studio_project' );
+function aipg_ajax_save_studio_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $name = isset( $_POST['template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['template_name'] ) ) : 'Untitled Project';
     $code = isset( $_POST['code'] ) ? wp_unslash( $_POST['code'] ) : ''; // The JSON response from AI
     
     if ( empty($code) ) wp_send_json_error( 'No content to save.' );
 
-    $projects = get_option( 'ndzaipg_studio_projects', [] );
+    $projects = get_option( 'aipg_studio_projects', [] );
     $project_id = 'pj_' . substr( md5( $name . time() ), 0, 8 );
 
     $projects[$project_id] = [
@@ -2369,7 +2349,7 @@ function ndzaipg_ajax_save_studio_project() {
         'timestamp' => time()
     ];
 
-    update_option( 'ndzaipg_studio_projects', $projects );
+    update_option( 'aipg_studio_projects', $projects );
 
     wp_send_json_success([
         'message'    => 'Project saved to library!',
@@ -2380,19 +2360,19 @@ function ndzaipg_ajax_save_studio_project() {
 /**
  * AJAX Handler for Listing Studio Projects
  */
-add_action( 'wp_ajax_ndzaipg_list_studio_projects', 'ndzaipg_ajax_list_studio_projects' );
-function ndzaipg_ajax_list_studio_projects() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_list_studio_projects', 'aipg_ajax_list_studio_projects' );
+function aipg_ajax_list_studio_projects() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     global $wpdb;
-    $table_name = $wpdb->prefix . 'ndzaipg_projects';
+    $table_name = $wpdb->prefix . 'aipg_projects';
     
     // 1. Fetch Local Projects
     $local_projects = $wpdb->get_results( "SELECT id, name, time as timestamp, snapshot FROM $table_name ORDER BY time DESC", ARRAY_A );
 
     // 2. Fetch Cloud History from Backend
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     $history_endpoint = rtrim($api_url, '/') . '/api/ai-studio/history';
     
     $response = wp_remote_get( $history_endpoint, [ 'timeout' => 15 ] );
@@ -2409,17 +2389,17 @@ function ndzaipg_ajax_list_studio_projects() {
     wp_send_json_success([
         'local'     => $local_projects,
         'cloud'     => $cloud_history,
-        'active_id' => get_option( 'ndzaipg_studio_active_project', '' )
+        'active_id' => get_option( 'aipg_studio_active_project', '' )
     ]);
 }
 
 /**
  * AJAX Handler for Removing a Project (Cleanup)
  */
-add_action( 'wp_ajax_ndzaipg_remove_studio_project', 'ndzaipg_ajax_remove_studio_project' );
-function ndzaipg_ajax_remove_studio_project() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_remove_studio_project', 'aipg_ajax_remove_studio_project' );
+function aipg_ajax_remove_studio_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $project_id = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
     $delete_from_history = isset( $_POST['delete_history'] ) ? (bool) $_POST['delete_history'] : false;
@@ -2432,7 +2412,7 @@ function ndzaipg_ajax_remove_studio_project() {
         'posts_per_page' => -1,
         'meta_query'     => [
             [
-                'key'   => '_ndzaipg_project_id',
+                'key'   => '_aipg_project_id',
                 'value' => $project_id,
             ]
         ]
@@ -2455,16 +2435,16 @@ function ndzaipg_ajax_remove_studio_project() {
 
     // 2. Clear from library if requested
     if ( $delete_from_history ) {
-        $projects = get_option( 'ndzaipg_studio_projects', [] );
+        $projects = get_option( 'aipg_studio_projects', [] );
         if ( isset($projects[$project_id]) ) {
             unset($projects[$project_id]);
-            update_option( 'ndzaipg_studio_projects', $projects );
+            update_option( 'aipg_studio_projects', $projects );
         }
     }
 
     // 3. Clear active project if it was this one
-    if ( get_option( 'ndzaipg_studio_active_project' ) === $project_id ) {
-        delete_option( 'ndzaipg_studio_active_project' );
+    if ( get_option( 'aipg_studio_active_project' ) === $project_id ) {
+        delete_option( 'aipg_studio_active_project' );
         // Optionally reset front page to default
         update_option( 'show_on_front', 'posts' );
     }
@@ -2477,14 +2457,14 @@ function ndzaipg_ajax_remove_studio_project() {
 /**
  * AJAX Handler for Contextual AI Editing (See-Click-Prompt)
  */
-add_action( 'wp_ajax_ndzaipg_studio_contextual_edit', 'ndzaipg_ajax_studio_contextual_edit' );
-add_action( 'wp_ajax_nopriv_ndzaipg_studio_contextual_edit', 'ndzaipg_ajax_studio_contextual_edit' );
-add_action( 'wp_ajax_ndzaipg_studio_insert_element', 'ndzaipg_ajax_studio_insert_element' );
-add_action( 'wp_ajax_nopriv_ndzaipg_studio_insert_element', 'ndzaipg_ajax_studio_insert_element' );
-add_action( 'wp_ajax_ndzaipg_save_as_project', 'ndzaipg_ajax_save_as_project' );
-add_action( 'wp_ajax_nopriv_ndzaipg_save_as_project', 'ndzaipg_ajax_save_as_project' );
-function ndzaipg_ajax_studio_contextual_edit() {
-    check_ajax_referer( 'ndzaipg_editor_nonce', 'nonce' );
+add_action( 'wp_ajax_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+add_action( 'wp_ajax_nopriv_aipg_studio_contextual_edit', 'aipg_ajax_studio_contextual_edit' );
+add_action( 'wp_ajax_aipg_studio_insert_element', 'aipg_ajax_studio_insert_element' );
+add_action( 'wp_ajax_nopriv_aipg_studio_insert_element', 'aipg_ajax_studio_insert_element' );
+add_action( 'wp_ajax_aipg_save_as_project', 'aipg_ajax_save_as_project' );
+add_action( 'wp_ajax_nopriv_aipg_save_as_project', 'aipg_ajax_save_as_project' );
+function aipg_ajax_studio_contextual_edit() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
 
     // Allow more time for complex AI requests since GenAI timeout is 90s
     if ( function_exists( 'set_time_limit' ) ) {
@@ -2492,7 +2472,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
         @set_time_limit( 240 ); 
     }
 
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $prompt          = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
     $markup          = isset( $_POST['markup'] ) ? wp_unslash( $_POST['markup'] ) : ''; // Gutenberg block HTML
@@ -2505,8 +2485,8 @@ function ndzaipg_ajax_studio_contextual_edit() {
         wp_send_json_error( 'Incomplete data for AI refinement.' );
     }
 
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000' );
-    $license = get_option( 'ndzaipg_license_key', '' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
+    $license = get_option( 'aipg_license_key', '' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/refine-block';
 
     // --- BLOCK GRAMMAR DETECTION ---
@@ -2525,7 +2505,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
 
     // 1. Check primary post first
     $full_parsed_tree = parse_blocks( $post->post_content );
-    $matched_block_node = ndzaipg_find_block_in_tree( $full_parsed_tree, $markup, $search_debug_log, $match_info );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $markup, $search_debug_log, $match_info );
 
     // 2. Scan all Block Templates if not found in primary post
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
@@ -2554,7 +2534,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
         
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
-            $match = ndzaipg_find_block_in_tree( $test_tree, $markup, $search_debug_log, $match_info );
+            $match = aipg_find_block_in_tree( $test_tree, $markup, $search_debug_log, $match_info );
             if ( $match ) {
                 error_log("[AI Studio] Block found in template: {$t->slug} ({$t->type})");
                 $matched_block_node = $match;
@@ -2628,7 +2608,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
         }
     }
 
-    $site_info = get_option( 'ndzaipg_site_info', [] );
+    $site_info = get_option( 'aipg_site_info', [] );
     $industry  = isset($site_info['industry']) ? $site_info['industry'] : '';
 
     $response = wp_remote_post( $endpoint, [
@@ -2643,7 +2623,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
             'parent_markup'   => $parent_markup,
             'model_tier'      => $model_tier,
             'industry'        => $industry,
-            'theme_config'    => get_option( 'ndzaipg_studio_theme_config' ) ?: null,
+            'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
             'dynamic_db_block'=> $serialized_target_block, // Hijacking this variable name to mean "Block Grammar Mode"
         ]),
         'timeout'     => 120,
@@ -2722,7 +2702,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
                 $tree_mutated = true;
                 $db_diagnostics[] = "Atomic Template Part Refinement: Successfully replaced entire tree.";
             } else {
-                $updated_tree = ndzaipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks, $data['new_markup'], $match_info );
+                $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_parsed_blocks, $data['new_markup'], $match_info );
                 
                 if ( $updated_tree === $full_parsed_tree ) {
                     $err_msg = "[AI Studio] CRITICAL WARNING: \$updated_tree is identical to \$full_parsed_tree! find_block and replace_block array comparison (\$block === \$original_node) FAILED to match!\n";
@@ -2792,19 +2772,19 @@ function ndzaipg_ajax_studio_contextual_edit() {
         // $new_block_grammar is just raw HTML and lacks the Gutenberg wrapper.
         // We must return the fully reconstructed parent block from the mutated tree 
         // so the frontend `replaceWith` maintains the wrapper structure.
-        if ( isset($matched_block_node['_ndzaipg_match_type']) && $matched_block_node['_ndzaipg_match_type'] === 'partial' ) {
+        if ( isset($matched_block_node['_aipg_match_type']) && $matched_block_node['_aipg_match_type'] === 'partial' ) {
             // Re-find the mutated block in the updated tree to render it
             // (We could do this more elegantly, but re-traversing the updated tree ensures 
             // we get the final serialized shape with the new innerHTML)
             // Actually, we mutated $full_parsed_tree by reference in the earlier logic, 
             // but tracking the exact node is tricky.
             // A simpler approach: we just serialized the entire updated tree to $new_post_content.
-            // Let's use `ndzaipg_find_block_in_tree` to find the exact replacement block in the newly serialized tree!
+            // Let's use `aipg_find_block_in_tree` to find the exact replacement block in the newly serialized tree!
             $new_parsed_tree = parse_blocks( $new_post_content );
             // Use the replacement string as the target to find it
             $temp_log = [];
             $temp_info = [];
-            $found_new_node = ndzaipg_find_block_in_tree( $new_parsed_tree, $data['new_markup'], $temp_log, $temp_info );
+            $found_new_node = aipg_find_block_in_tree( $new_parsed_tree, $data['new_markup'], $temp_log, $temp_info );
             if ( $found_new_node ) {
                 $rendered_markup = do_blocks( serialize_blocks([$found_new_node]) );
                 $db_diagnostics[] = "Partial Match Re-wrap: Retrieved updated parent block wrapper for frontend.";
@@ -2824,7 +2804,7 @@ function ndzaipg_ajax_studio_contextual_edit() {
                 $slug = $attrs['slug'] ?? '';
                 $theme = $attrs['theme'] ?? wp_get_theme()->get_stylesheet();
                 $tag = $attrs['tagName'] ?? (strpos($slug, 'footer') !== false ? 'footer' : (strpos($slug, 'header') !== false ? 'header' : 'div'));
-                $class_str = "wp-block-template-part ndzaipg-part-{$slug}";
+                $class_str = "wp-block-template-part aipg-part-{$slug}";
                 
                 $style_data = isset($attrs['style']) ? wp_style_engine_get_styles($attrs['style']) : [];
                 if (!empty($style_data['class'])) {
@@ -2881,14 +2861,14 @@ function ndzaipg_ajax_studio_contextual_edit() {
 /**
  * AJAX Handler for Omni-Directional Block Insertion (Duplicate or AI Generate)
  */
-function ndzaipg_ajax_studio_insert_element() {
-    check_ajax_referer( 'ndzaipg_editor_nonce', 'nonce' );
+function aipg_ajax_studio_insert_element() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
 
     if ( function_exists( 'set_time_limit' ) ) {
         @set_time_limit( 240 ); 
     }
 
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $position      = isset( $_POST['position'] ) ? sanitize_text_field( wp_unslash( $_POST['position'] ) ) : 'after';
     $lookup_markup = isset( $_POST['lookup_markup'] ) ? wp_unslash( $_POST['lookup_markup'] ) : ''; // The target block
@@ -2913,13 +2893,13 @@ function ndzaipg_ajax_studio_insert_element() {
 
     // Find block
     $full_parsed_tree = parse_blocks( $post->post_content );
-    $matched_block_node = ndzaipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
 
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
         $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
-            $match = ndzaipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
+            $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
             if ( $match ) {
                 $matched_block_node = $match;
                 $full_parsed_tree = $test_tree;
@@ -2950,11 +2930,11 @@ function ndzaipg_ajax_studio_insert_element() {
         $new_block_grammar = '';
     } else {
         // AI Generation Call
-        $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000' );
-        $license = get_option( 'ndzaipg_license_key', '' );
+        $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
+        $license = get_option( 'aipg_license_key', '' );
         $endpoint = rtrim($api_url, '/') . '/api/ai-studio/generate-block';
 
-        $site_info = get_option( 'ndzaipg_site_info', [] );
+        $site_info = get_option( 'aipg_site_info', [] );
         $industry  = isset($site_info['industry']) ? $site_info['industry'] : '';
         $model_tier = isset( $_POST['model_tier'] ) ? sanitize_text_field( wp_unslash( $_POST['model_tier'] ) ) : 'medium';
 
@@ -2968,7 +2948,7 @@ function ndzaipg_ajax_studio_insert_element() {
                 'parent_markup'   => serialize_blocks([$matched_block_node]), // Use target as context
                 'model_tier'      => $model_tier,
                 'industry'        => $industry,
-                'theme_config'    => get_option( 'ndzaipg_studio_theme_config' ) ?: null,
+                'theme_config'    => get_option( 'aipg_studio_theme_config' ) ?: null,
             ]),
             'timeout'     => 120,
         ]);
@@ -2997,7 +2977,7 @@ function ndzaipg_ajax_studio_insert_element() {
     }
 
     // Insert into tree
-    $updated_tree = ndzaipg_insert_block_in_tree( $full_parsed_tree, $matched_block_node, $new_blocks_array, $position );
+    $updated_tree = aipg_insert_block_in_tree( $full_parsed_tree, $matched_block_node, $new_blocks_array, $position );
 
     if ( $updated_tree === $full_parsed_tree ) {
         wp_send_json_error( 'Failed to insert the block into the syntax tree.' );
@@ -3047,11 +3027,11 @@ function ndzaipg_ajax_studio_insert_element() {
 /**
  * AJAX Handler for INSTANT Manual Block Tweaks (Zero AI)
  */
-add_action( 'wp_ajax_ndzaipg_studio_manual_edit', 'ndzaipg_ajax_studio_manual_edit' );
-add_action( 'wp_ajax_nopriv_ndzaipg_studio_manual_edit', 'ndzaipg_ajax_studio_manual_edit' );
-function ndzaipg_ajax_studio_manual_edit() {
-    check_ajax_referer( 'ndzaipg_editor_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_studio_manual_edit', 'aipg_ajax_studio_manual_edit' );
+add_action( 'wp_ajax_nopriv_aipg_studio_manual_edit', 'aipg_ajax_studio_manual_edit' );
+function aipg_ajax_studio_manual_edit() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $markup          = isset( $_POST['markup'] ) ? wp_unslash( $_POST['markup'] ) : ''; 
     $lookup_markup   = isset( $_POST['lookup_markup'] ) ? wp_unslash( $_POST['lookup_markup'] ) : $markup;
@@ -3075,7 +3055,7 @@ function ndzaipg_ajax_studio_manual_edit() {
         wp_send_json_error( 'Incomplete data for manual refinement.' );
     }
 
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000' );
     $endpoint = rtrim($api_url, '/') . '/api/ai-studio/manual-tweak';
 
     $matched_block_node = null;
@@ -3094,14 +3074,14 @@ function ndzaipg_ajax_studio_manual_edit() {
 
     // 1. Check primary post
     $full_parsed_tree = parse_blocks( $post->post_content );
-    $matched_block_node = ndzaipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
+    $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
 
     // 2. Scan templates if not found
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
         $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
-            $match = ndzaipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
+            $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
             if ( $match ) {
                 $matched_block_node = $match;
                 $full_parsed_tree = $test_tree;
@@ -3156,7 +3136,7 @@ function ndzaipg_ajax_studio_manual_edit() {
     }
 
     $new_block_grammar = $data['new_markup'];
-    $updated_tree = ndzaipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
+    $updated_tree = aipg_replace_block_in_tree( $full_parsed_tree, $matched_block_node, $new_block_grammar );
     $new_post_content = serialize_blocks( $updated_tree );
 
     // Determine save location
@@ -3194,8 +3174,8 @@ function ndzaipg_ajax_studio_manual_edit() {
 /**
  * AJAX handler to save the current page state as a Project snapshot.
  */
-function ndzaipg_ajax_save_as_project() {
-    check_ajax_referer( 'ndzaipg_editor_nonce', 'nonce' );
+function aipg_ajax_save_as_project() {
+    check_ajax_referer( 'aipg_editor_nonce', 'nonce' );
     
     $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
     $project_name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : 'Untitled Project';
@@ -3203,14 +3183,14 @@ function ndzaipg_ajax_save_as_project() {
     if (!$post_id) wp_send_json_error('Missing Post ID');
 
     global $wpdb;
-    $table_name = $wpdb->prefix . 'ndzaipg_projects';
+    $table_name = $wpdb->prefix . 'aipg_projects';
 
     // Capture current post content
     $post = get_post($post_id);
     $content = $post->post_content;
 
     // Capture global styles (theme config)
-    $theme_config = get_option( 'ndzaipg_studio_theme_config', [] );
+    $theme_config = get_option( 'aipg_studio_theme_config', [] );
 
     // Capture active template if FSE
     $snapshot = [
@@ -3239,23 +3219,23 @@ function ndzaipg_ajax_save_as_project() {
 /**
  * AJAX handler to load a Project snapshot.
  */
-add_action( 'wp_ajax_ndzaipg_load_project', 'ndzaipg_ajax_load_project' );
-function ndzaipg_ajax_load_project() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_load_project', 'aipg_ajax_load_project' );
+function aipg_ajax_load_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $project_id = isset($_POST['project_id']) ? sanitize_text_field(wp_unslash($_POST['project_id'])) : '';
     if (empty($project_id)) wp_send_json_error('Missing Project ID');
 
     global $wpdb;
-    $table_name = $wpdb->prefix . 'ndzaipg_projects';
+    $table_name = $wpdb->prefix . 'aipg_projects';
     
     // Try local lookup (supports both numeric and UUID strings if they were saved locally)
     $project = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table_name WHERE id = %s", $project_id ) );
 
     if (!$project) {
         // FALLBACK: Check AI Studio Cloud
-        $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+        $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
         $endpoint = rtrim($api_url, '/') . '/api/ai-studio/jobs/' . $project_id;
         
         $response = wp_remote_get( $endpoint, [ 'timeout' => 20 ] );
@@ -3295,7 +3275,7 @@ function ndzaipg_ajax_load_project() {
 
     // Restore Theme Config
     if (isset($snapshot['theme_config'])) {
-        update_option('ndzaipg_studio_theme_config', $snapshot['theme_config']);
+        update_option('aipg_studio_theme_config', $snapshot['theme_config']);
     }
 
     wp_send_json_success([
@@ -3307,16 +3287,16 @@ function ndzaipg_ajax_load_project() {
 /**
  * AJAX handler to delete a Project snapshot.
  */
-add_action( 'wp_ajax_ndzaipg_delete_project', 'ndzaipg_ajax_delete_project' );
-function ndzaipg_ajax_delete_project() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
+add_action( 'wp_ajax_aipg_delete_project', 'aipg_ajax_delete_project' );
+function aipg_ajax_delete_project() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) wp_send_json_error( 'Permission denied.' );
 
     $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
     if (!$project_id) wp_send_json_error('Missing Project ID');
 
     global $wpdb;
-    $table_name = $wpdb->prefix . 'ndzaipg_projects';
+    $table_name = $wpdb->prefix . 'aipg_projects';
     $result = $wpdb->delete($table_name, ['id' => $project_id], ['%d']);
 
     if ($result === false) {
@@ -3336,7 +3316,7 @@ function ndzaipg_ajax_delete_project() {
  * @param array &$match_info Pass by reference array to return match type
  * @return array|null The matched block array, or null if not found
  */
-function ndzaipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = [], &$match_info = [] ) {
+function aipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log = [], &$match_info = [] ) {
     if ( empty( $parsed_blocks ) ) return null;
 
     // Helper: Normalize spacing and WP typography (smart quotes, dashes)
@@ -3408,7 +3388,7 @@ function ndzaipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log =
                         if (preg_match('/^wp-container-/i', $c)) continue;
                         if (preg_match('/^is-layout-/i', $c)) continue;
                         if (preg_match('/-is-layout-/i', $c)) continue;
-                        if (preg_match('/^ndzaipg-/i', $c)) continue;
+                        if (preg_match('/^aipg-/i', $c)) continue;
                         $filtered_classes[] = $c;
                     }
                     if (!empty($filtered_classes)) {
@@ -3444,7 +3424,7 @@ function ndzaipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log =
 
         // 1. Recurse into InnerBlocks FIRST (Bottom-up traversal)
         if ( ! empty( $block['innerBlocks'] ) ) {
-            $found_inside = ndzaipg_find_block_in_tree( $block['innerBlocks'], $target_html, $debug_log, $match_info );
+            $found_inside = aipg_find_block_in_tree( $block['innerBlocks'], $target_html, $debug_log, $match_info );
             if ( $found_inside ) return $found_inside;
         }
 
@@ -3494,7 +3474,7 @@ function ndzaipg_find_block_in_tree( $parsed_blocks, $target_html, &$debug_log =
  * @param array $match_info    Information generated about the match logic
  * @return array The updated tree
  */
-function ndzaipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks, $new_raw_html = '', $match_info = [] ) {
+function aipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blocks, $new_raw_html = '', $match_info = [] ) {
     if ( empty( $new_blocks ) && empty( $new_raw_html ) ) return $parsed_blocks;
 
     foreach ( $parsed_blocks as $k => &$block ) {
@@ -3549,7 +3529,7 @@ function ndzaipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blo
         }
         
         if ( ! empty( $block['innerBlocks'] ) ) {
-            $updated_inner = ndzaipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_blocks, $new_raw_html, $match_info );
+            $updated_inner = aipg_replace_block_in_tree( $block['innerBlocks'], $original_node, $new_blocks, $new_raw_html, $match_info );
             if ( $updated_inner !== $block['innerBlocks'] ) {
                 $block['innerBlocks'] = $updated_inner;
                 return $parsed_blocks; // Return early once found and replaced
@@ -3570,7 +3550,7 @@ function ndzaipg_replace_block_in_tree( $parsed_blocks, $original_node, $new_blo
  * @param string $position        Position ('before', 'after', 'left', 'right', 'top', 'bottom'). Default 'after'.
  * @return array The mutated block tree.
  */
-function ndzaipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blocks, $position = 'after' ) {
+function aipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blocks, $position = 'after' ) {
     // If we're not deleting, and there are no new blocks, return early without doing anything.
     if ( empty( $new_blocks ) && ( !isset($_POST['action_type']) || $_POST['action_type'] !== 'delete' ) ) return $parsed_blocks;
 
@@ -3589,7 +3569,7 @@ function ndzaipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blo
         
         // Let's check innerBlocks
         if ( ! empty( $block['innerBlocks'] ) ) {
-            $updated_inner = ndzaipg_insert_block_in_tree( $block['innerBlocks'], $reference_node, $new_blocks, $position );
+            $updated_inner = aipg_insert_block_in_tree( $block['innerBlocks'], $reference_node, $new_blocks, $position );
             if ( $updated_inner !== $block['innerBlocks'] ) {
                 $block['innerBlocks'] = $updated_inner;
                 return $parsed_blocks;
@@ -3602,24 +3582,24 @@ function ndzaipg_insert_block_in_tree( $parsed_blocks, $reference_node, $new_blo
 
 
 // 10. AJAX Handler for Getting Version History
-add_action( 'wp_ajax_ndzaipg_get_version_history', 'ndzaipg_ajax_get_version_history' );
-function ndzaipg_ajax_get_version_history() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_get_version_history', 'aipg_ajax_get_version_history' );
+function aipg_ajax_get_version_history() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
     $project_id = isset( $_POST['project_id'] ) ? sanitize_text_field( wp_unslash( $_POST['project_id'] ) ) : '';
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
     $response = wp_remote_get( rtrim( $api_url, '/' ) . "/api/projects/$project_id/versions", [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 15
     ]);
@@ -3633,18 +3613,18 @@ function ndzaipg_ajax_get_version_history() {
 }
 
 // 11. AJAX Handler for Rolling back to a version
-add_action( 'wp_ajax_ndzaipg_rollback_version', 'ndzaipg_ajax_rollback_version' );
-function ndzaipg_ajax_rollback_version() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_rollback_version', 'aipg_ajax_rollback_version' );
+function aipg_ajax_rollback_version() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
          wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
     $plugin_id = isset( $_POST['plugin_id'] ) ? intval( wp_unslash( $_POST['plugin_id'] ) ) : 0;
     $version_id = isset( $_POST['version_id'] ) ? sanitize_text_field( wp_unslash( $_POST['version_id'] ) ) : '';
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
@@ -3652,7 +3632,7 @@ function ndzaipg_ajax_rollback_version() {
     $response = wp_remote_get( rtrim( $api_url, '/' ) . "/api/versions/$version_id/code", [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 20
     ]);
@@ -3683,7 +3663,7 @@ function ndzaipg_ajax_rollback_version() {
     }
 
     // Update DB
-    $headers = ndzaipg_parse_plugin_headers($code);
+    $headers = aipg_parse_plugin_headers($code);
     // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
     $wpdb->update(
         "{$wpdb->prefix}ai_plugins",
@@ -3701,20 +3681,20 @@ function ndzaipg_ajax_rollback_version() {
 }
 
 // 12. AJAX Handler for Fetching Legal Content
-add_action( 'wp_ajax_ndzaipg_get_legal_content', 'ndzaipg_ajax_get_legal_content' );
-function ndzaipg_ajax_get_legal_content() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_get_legal_content', 'aipg_ajax_get_legal_content' );
+function aipg_ajax_get_legal_content() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
-    $license_key = get_option( 'ndzaipg_license_key', '' );
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $license_key = get_option( 'aipg_license_key', '' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
 
     $response = wp_remote_get( rtrim( $api_url, '/' ) . '/api/public/legal/latest-content', [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 15
     ]);
@@ -3728,24 +3708,24 @@ function ndzaipg_ajax_get_legal_content() {
 }
 
 // 13. AJAX Handler for Accepting Legal Terms
-add_action( 'wp_ajax_ndzaipg_accept_legal_terms', 'ndzaipg_ajax_accept_legal_terms' );
-function ndzaipg_ajax_accept_legal_terms() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_accept_legal_terms', 'aipg_ajax_accept_legal_terms' );
+function aipg_ajax_accept_legal_terms() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
     $accepted_version_ids = isset($_POST['accepted_version_ids']) ? array_map('intval', $_POST['accepted_version_ids']) : [];
     $marketing_consent_version_id = isset($_POST['marketing_consent_version_id']) ? intval($_POST['marketing_consent_version_id']) : null;
 
-    $license_key = get_option( 'ndzaipg_license_key', '' );
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $license_key = get_option( 'aipg_license_key', '' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
 
     $payload = [
         'accepted_version_ids' => $accepted_version_ids,
         'client_ip' => isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '',
         'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '',
-        'source' => 'WP-Plugin v' . NDZAIPG_VERSION
+        'source' => 'WP-Plugin v' . AIPG_VERSION
     ];
 
     if ($marketing_consent_version_id) {
@@ -3755,7 +3735,7 @@ function ndzaipg_ajax_accept_legal_terms() {
     $response = wp_remote_post( rtrim( $api_url, '/' ) . '/api/public/legal/accept', [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION,
+            'X-Plugin-Version' => AIPG_VERSION,
             'Content-Type' => 'application/json'
         ],
         'body' => json_encode($payload),
@@ -3778,23 +3758,23 @@ function ndzaipg_ajax_accept_legal_terms() {
 
 
 // 14. AJAX Handler for Syncing Remote Projects
-add_action( 'wp_ajax_ndzaipg_sync_remote_projects', 'ndzaipg_ajax_sync_remote_projects' );
-function ndzaipg_ajax_sync_remote_projects() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_sync_remote_projects', 'aipg_ajax_sync_remote_projects' );
+function aipg_ajax_sync_remote_projects() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START: Try localhost instead of host.docker.internal for non-docker setups
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
     $response = wp_remote_get( rtrim( $api_url, '/' ) . "/api/projects", [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 20
     ]);
@@ -3872,13 +3852,13 @@ function ndzaipg_ajax_sync_remote_projects() {
 }
 
 // 15. AJAX Handler for Installing Remote Plugin
-add_action( 'wp_ajax_ndzaipg_install_remote_plugin', 'ndzaipg_ajax_install_remote_plugin' );
-function ndzaipg_ajax_install_remote_plugin() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_install_remote_plugin', 'aipg_ajax_install_remote_plugin' );
+function aipg_ajax_install_remote_plugin() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
-    if ( ! ndzaipg_is_plugins_writable() ) {
+    if ( ! aipg_is_plugins_writable() ) {
         wp_send_json_error( esc_html__( 'Plugins directory is not writable.', 'ai-studio-generator' ) );
     }
 
@@ -3896,16 +3876,16 @@ function ndzaipg_ajax_install_remote_plugin() {
         wp_send_json_error( esc_html__( 'No remote version ID found for this plugin.', 'ai-studio-generator' ) );
     }
 
-    $license_key = get_option( 'ndzaipg_license_key', '' );
+    $license_key = get_option( 'aipg_license_key', '' );
     // DEV-START
-    $api_url = get_option( 'ndzaipg_api_url', 'http://host.docker.internal:8000/' );
+    $api_url = get_option( 'aipg_api_url', 'http://host.docker.internal:8000/' );
     // DEV-END
     // PROD-API-URL: $api_url = 'https://app.nodevzone.com/';
 
     $response = wp_remote_get( rtrim( $api_url, '/' ) . "/api/versions/$version_id/code", [
         'headers' => [ 
             'X-License-Key' => $license_key,
-            'X-Plugin-Version' => NDZAIPG_VERSION
+            'X-Plugin-Version' => AIPG_VERSION
         ],
         'timeout' => 20
     ]);
@@ -3968,10 +3948,10 @@ function ndzaipg_ajax_install_remote_plugin() {
 }
 
 // 16. AJAX Handler for Deleting Plugin
-add_action( 'wp_ajax_ndzaipg_remove_plugin_files', 'ndzaipg_ajax_delete_plugin' );
-function ndzaipg_ajax_delete_plugin() {
-    check_ajax_referer( 'ndzaipg_ajax_nonce', 'nonce' );
-    if ( ! ndzaipg_current_user_can_access() ) {
+add_action( 'wp_ajax_aipg_remove_plugin_files', 'aipg_ajax_delete_plugin' );
+function aipg_ajax_delete_plugin() {
+    check_ajax_referer( 'aipg_ajax_nonce', 'nonce' );
+    if ( ! aipg_current_user_can_access() ) {
         wp_send_json_error( esc_html__( 'Permission denied.', 'ai-studio-generator' ) );
     }
 
