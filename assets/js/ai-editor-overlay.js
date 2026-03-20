@@ -11,9 +11,11 @@
         $currentBlock: null,
         originalBlockMarkup: null,
         isEditing: false,
-        aiEnabled: true,
-        outlinesEnabled: false,
         modelTier: 'medium',
+        marginTargetMode: 'current',
+        paddingTargetMode: 'current',
+        lastFocusedMarginInput: 'aipg-manual-mt',
+        lastFocusedPaddingInput: 'aipg-manual-pt',
 
         init: function () {
             this.aiEnabled = localStorage.getItem('aipg_ai_enabled') !== 'false';
@@ -54,6 +56,25 @@
             `).appendTo('body');
             this.$label = $('<div class="aipg-block-label">✨ <span>Edit with AI</span></div>').appendTo(this.$overlay);
 
+            // Structure Navigator Panel
+            this.$navigator = $(`
+                <div class="aipg-navigator-panel" id="aipg-structure-navigator" style="display: none;">
+                    <div class="aipg-nav-header">
+                        <div class="aipg-nav-title">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            Structure
+                        </div>
+                        <div class="aipg-nav-controls">
+                            <button class="ws-btn-secondary" id="aipg-refresh-nav-btn" style="padding: 2px 6px; font-size: 10px;" title="Refresh Structure">↻</button>
+                            <button class="ws-btn-secondary" id="aipg-close-nav-btn" style="padding: 2px 6px; font-size: 10px;">✕</button>
+                        </div>
+                    </div>
+                    <div class="aipg-nav-tree-area">
+                        <ul class="aipg-nav-tree"></ul>
+                    </div>
+                </div>
+            `).appendTo('body');
+
             this.$modal = $(`
                 <div class="aipg-modal-backdrop"></div>
                 
@@ -90,8 +111,8 @@
                             </div>
                         </div>
 
-                        <!-- Style Tab (Manual Overrides) -->
-                        <div class="aipg-tab-content" id="tab-manual-style">
+                             <div class="aipg-control-divider" style="margin-top: 5px;">Background</div>
+
                             <div class="aipg-control-group">
                                 <label class="aipg-control-label">Background Color</label>
                                 <div style="display: flex; gap: 8px;">
@@ -127,17 +148,21 @@
                             </div>
 
                             <div class="aipg-control-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                    <label class="aipg-control-label" style="margin: 0;">Margin</label>
-                                    <div style="display: flex; gap: 8px; align-items: center;">
-                                        <select id="aipg-margin-unit" class="aipg-unit-select" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #ccc; border: 1px solid rgba(255,255,255,0.1);">
-                                            <option value="px">px</option>
-                                            <option value="em">em</option>
-                                            <option value="rem" selected>rem</option>
-                                            <option value="%">%</option>
-                                        </select>
-                                        <button class="aipg-link-btn active" id="aipg-link-margin" title="Link values together">🔗</button>
+                                <label class="aipg-control-label">Margin</label>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                                    <div class="aipg-toggle-group" id="aipg-margin-target-toggle">
+                                        <button class="aipg-mini-btn active" data-mode="current" title="Target Selected Element">Selected</button>
+                                        <button class="aipg-mini-btn" data-mode="parent" title="Target Outer Wrapper">Parent</button>
                                     </div>
+                                    <select id="aipg-margin-unit" class="aipg-unit-select">
+                                        <option value="px">px</option>
+                                        <option value="em">em</option>
+                                        <option value="rem" selected>rem</option>
+                                        <option value="%">%</option>
+                                    </select>
+                                    <button class="aipg-link-btn active" id="aipg-link-margin" title="Link values together">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                    </button>
                                 </div>
                                 <input type="range" id="aipg-slider-margin" min="0" max="10" step="0.1" value="0" style="margin-top: 0;">
                                 <div class="aipg-spacing-grid aipg-4way">
@@ -161,17 +186,21 @@
                             </div>
 
                             <div class="aipg-control-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                    <label class="aipg-control-label" style="margin: 0;">Padding</label>
-                                    <div style="display: flex; gap: 8px; align-items: center;">
-                                        <select id="aipg-padding-unit" class="aipg-unit-select" style="font-size: 11px; padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #ccc; border: 1px solid rgba(255,255,255,0.1);">
-                                            <option value="px">px</option>
-                                            <option value="em">em</option>
-                                            <option value="rem" selected>rem</option>
-                                            <option value="%">%</option>
-                                        </select>
-                                        <button class="aipg-link-btn active" id="aipg-link-padding" title="Link values together">🔗</button>
+                                <label class="aipg-control-label">Padding</label>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                                    <div class="aipg-toggle-group" id="aipg-padding-target-toggle">
+                                        <button class="aipg-mini-btn active" data-mode="current" title="Target Selected Element">Selected</button>
+                                        <button class="aipg-mini-btn" data-mode="parent" title="Target Outer Wrapper">Parent</button>
                                     </div>
+                                    <select id="aipg-padding-unit" class="aipg-unit-select">
+                                        <option value="px">px</option>
+                                        <option value="em">em</option>
+                                        <option value="rem" selected>rem</option>
+                                        <option value="%">%</option>
+                                    </select>
+                                    <button class="aipg-link-btn active" id="aipg-link-padding" title="Link values together">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                    </button>
                                 </div>
                                 <input type="range" id="aipg-slider-padding" min="0" max="10" step="0.1" value="0" style="margin-top: 0;">
                                 <div class="aipg-spacing-grid aipg-4way">
@@ -235,7 +264,7 @@
 
                             <div style="margin-top: 20px;">
                                 <label class="aipg-control-label">Insert Position</label>
-                                <div class="aipg-toggle-group">
+                                <div class="aipg-toggle-group" id="aipg-add-pos-toggle">
                                     <button class="aipg-mini-btn active" data-pos="below">Below Selection</button>
                                     <button class="aipg-mini-btn" data-pos="above">Above Selection</button>
                                 </div>
@@ -244,6 +273,8 @@
                     </div>
 
                     <div class="aipg-sidebar-footer">
+                        <div style="display: flex; gap: 8px; width: 100%; margin-bottom: 10px;">
+                        </div>
                         <div id="aipg-manual-save-status" style="font-size: 11px; color: #888; flex: 1;">Waiting for changes...</div>
                         <button class="ws-btn-primary" id="aipg-manual-save-btn">Save Changes</button>
                     </div>
@@ -315,21 +346,25 @@
                         <div class="aipg-mode-label">AI Edit Mode</div>
                         <div class="aipg-mode-desc">Click elements to refine</div>
                     </div>
-                    ${this.aiEnabled ? `
-                        <select id="aipg-model-tier-select" class="aipg-save-btn" style="margin-left: 15px; padding: 6px 10px; font-size: 12px; outline: none; cursor: pointer; appearance: menulist; min-height: 31px;">
-                            <option value="medium" style="color: black;" ${this.modelTier === 'medium' ? 'selected' : ''}>Simple (Gemini Flash)</option>
-                            <option value="complex" style="color: black;" ${this.modelTier === 'complex' ? 'selected' : ''}>Advanced (Gemini Pro)</option>
-                            <option value="claude_auto" style="color: black;" ${this.modelTier === 'claude_auto' ? 'selected' : ''}>Claude (Auto)</option>
-                        </select>
-                        <button id="aipg-toggle-outlines-btn" class="aipg-save-btn" style="margin-left: 10px; background: ${this.outlinesEnabled ? '#e67e22' : '#7f8c8d'};" title="Show Structural Outlines">
-                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M4 4h16v16H4z"></path></svg>
-                            Outlines
-                        </button>
-                        <button id="aipg-save-project-btn" class="aipg-save-btn">Save Project</button>
-                        <button id="aipg-exit-wizard-btn" class="aipg-exit-btn" title="Exit to Wizard">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        </button>
-                    ` : ''}
+                    <div class="aipg-toggle-divider"></div>
+                    <button id="aipg-toggle-nav-btn" class="aipg-mode-btn" title="Structure Navigator">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        Navigator
+                    </button>
+                    <select id="aipg-model-tier-select" class="aipg-mode-select">
+                        <option value="medium" ${this.modelTier === 'medium' ? 'selected' : ''}>Flash</option>
+                        <option value="complex" ${this.modelTier === 'complex' ? 'selected' : ''}>Pro</option>
+                        <option value="claude_auto" ${this.modelTier === 'claude_auto' ? 'selected' : ''}>Claude</option>
+                    </select>
+                    <button id="aipg-toggle-outlines-btn" class="aipg-mode-btn ${this.outlinesEnabled ? 'active' : ''}" title="Show Structural Outlines">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M4 4h16v16H4z"></path></svg>
+                        Outlines
+                    </button>
+                    <button id="aipg-save-project-btn" class="aipg-mode-btn aipg-btn-primary">Save Project</button>
+                    <button id="aipg-exit-wizard-btn" class="aipg-mode-btn aipg-btn-exit" title="Exit to Wizard">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 4px; vertical-align: middle;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        Exit
+                    </button>
                 </div>
             `).appendTo('body');
 
@@ -344,7 +379,18 @@
 
             $(document).on('mouseenter', targetSelectors, function (e) {
                 if (!self.aiEnabled || self.isEditing) return;
-                const $el = $(this);
+                let $el = $(this);
+
+                // PROTECT: If we are already editing THIS block, don't show the hover overlay (the redundant buttons)
+                if (self.isEditing && self.$currentBlock && self.$currentBlock[0] === $el[0]) {
+                    // But ensure it's visible if it was hidden
+                    self.$overlay.show().addClass('aipg-active');
+                    return;
+                }
+
+                // Apply interactive target resolution (skip structural BEM elements)
+                $el = self.resolveInteractiveTarget($el);
+                if (!$el || $el.length === 0) return;
 
                 const isGlobalWrapper = $el.is('body, html, .wp-site-blocks, .is-root-container, #wp-studio-wizard-root');
                 if (isGlobalWrapper) {
@@ -365,6 +411,10 @@
                 // Stop propagation so we pick the innermost block when hovering specifically,
                 // BUT we allow the user to reach outer blocks if they hover on their edges.
                 e.stopPropagation();
+
+                // If we are currently selecting via Navigator or in Refine Mode, ignore hover highlights
+                if (self._navSelecting || self.isEditing) return;
+
                 self.highlightBlock($el);
 
                 if (self.outlinesEnabled) {
@@ -402,7 +452,9 @@
             });
 
             $(document).on('mouseleave', targetSelectors, function (e) {
-                if (!self.aiEnabled || self.isEditing) return;
+                // If we are currently focusing the Navigator or just performed a Navigator-triggered highlight, ignore
+                const timeSinceNavHighlight = Date.now() - (self._lastNavHighlightTime || 0);
+                if (!self.aiEnabled || self.isEditing || self._navFocus || timeSinceNavHighlight < 500) return;
 
                 // Prevent flicker: if we are moving from the block into the overlay's buttons, don't hide
                 if (e.relatedTarget && $(e.relatedTarget).closest('.aipg-block-overlay').length) {
@@ -418,7 +470,8 @@
 
             // When the mouse leaves the overlay buttons (which have pointer-events auto)
             $(document).on('mouseleave', '.aipg-block-overlay', function (e) {
-                if (!self.aiEnabled || self.isEditing) return;
+                const timeSinceNavHighlight = Date.now() - (self._lastNavHighlightTime || 0);
+                if (!self.aiEnabled || self.isEditing || self._navFocus || timeSinceNavHighlight < 500) return;
 
                 // Did we move back to the currently highlighted block?
                 if (self.$currentBlock && e.relatedTarget) {
@@ -434,26 +487,29 @@
                 }
             });
 
-            // Click detection via coordinates (to avoid flickering from pointer-events: auto)
+            // Click detection globally to allow selecting blocks even when not hovering
             $(document).on('mousedown', function (e) {
-                if (!self.aiEnabled || self.isEditing || !self.$overlay.is(':visible')) return;
+                if (!self.aiEnabled) return;
 
-                // Ignore clicks on omni buttons and the delete button
+                // Stop if clicking our own UI elements (sidebar, mode toggle, overlays)
+                if ($(e.target).closest('.aipg-editor-modal, .aipg-mode-toggle, .aipg-block-overlay, #aipg-custom-confirm-modal, #aipg-custom-alert-modal, .aipg-outline-box, .aipg-modal-backdrop-FIXED_REMOVE').length > 0) return;
+
+                // Ignore clicks on omni buttons and the delete button inside the overlay
                 if ($(e.target).closest('.aipg-omni-node, .aipg-omni-del').length) return;
 
-                const o = self.$overlay.offset();
-                const w = self.$overlay.outerWidth();
-                const h = self.$overlay.outerHeight();
+                // Detect if the user clicked a block-like element
+                let $targetEl = $(e.target);
+                let $block = self.resolveInteractiveTarget($targetEl);
 
-                // Check if click is within overlay bounds
-                if (e.pageY >= o.top && e.pageY <= (o.top + h) &&
-                    e.pageX >= o.left && e.pageX <= (o.left + w)) {
-
+                if ($block && $block.length) {
+                    // Valid block found! Switch focus and open editor.
                     e.preventDefault();
                     e.stopPropagation();
+                    self.highlightBlock($block);
                     self.openModal();
                 }
             });
+
 
             // Save Project Button
             $(document).on('click', '#aipg-save-project-btn', function (e) {
@@ -545,8 +601,94 @@
 
             // Modal Actions
             $('#aipg-cancel-edit').on('click', () => self.closeModal());
-            $('#aipg-submit-edit').on('click', () => self.submitToAi());
+            $('#aipg-manual-save-btn').on('click', () => self.saveManualTweaks());
             $('#aipg-close-error-modal').on('click', () => self.closeErrorModal());
+
+            // Navigator Toggle
+            $(document).on('click', '#aipg-toggle-nav-btn', function() {
+                self.$navigator.fadeToggle(200);
+                if (self.$navigator.is(':visible')) {
+                    self.refreshNavigator();
+                }
+            });
+
+            $(document).on('click', '#aipg-close-nav-btn', () => this.$navigator.fadeOut(200));
+            $(document).on('click', '#aipg-refresh-nav-btn', () => this.refreshNavigator());
+
+            // Tree Interactions
+            $(document).on('click', '.aipg-nav-label', function(e) {
+                e.stopPropagation();
+                const $item = $(this).closest('.aipg-nav-item');
+                const $target = $item.data('el');
+                
+                if ($target && $target.length) {
+                    // Set a selection lock so hover handlers don't immediately hide the overlay
+                    self._navSelecting = true;
+                    self.highlightBlock($target, true); // Scroll on click
+                    self.openModal();
+                    
+                    $('.aipg-nav-item').removeClass('active');
+                    $item.addClass('active');
+
+                    // Release lock after a short delay to allow stable selection
+                    setTimeout(() => { self._navSelecting = false; }, 500);
+                }
+            });
+
+            $(document).on('click', '.aipg-nav-toggle', function(e) {
+                e.stopPropagation();
+                $(this).closest('.aipg-nav-item').toggleClass('expanded');
+            });
+
+            $(document).on('mouseenter', '#aipg-structure-navigator', function() {
+                self._navFocus = true;
+            });
+            $(document).on('mouseleave', '#aipg-structure-navigator', function() {
+                self._navFocus = false;
+            });
+
+            $(document).on('mouseenter', '.aipg-nav-label', function() {
+                const $target = $(this).closest('.aipg-nav-item').data('el');
+                if ($target) {
+                    if (self._navHighlightTimer) clearTimeout(self._navHighlightTimer);
+                    
+                    self._lastNavHighlightTime = Date.now();
+                    self._navHighlightTimer = setTimeout(() => {
+                        self.highlightBlock($target, true);
+                    }, 50); // Small debounce to avoid flickering during rapid movement
+                }
+            });
+            
+            $(document).on('mouseleave', '.aipg-nav-label', function() {
+                if (self._navHighlightTimer) clearTimeout(self._navHighlightTimer);
+            });
+
+            // Drag Navigator Logic
+            let isDragging = false, startX, startY, startLeft, startTop;
+            $(document).on('mousedown', '.aipg-nav-header', function(e) {
+                if ($(e.target).closest('button').length) return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                const offset = self.$navigator.offset();
+                startLeft = offset.left;
+                startTop = offset.top - $(window).scrollTop();
+                e.preventDefault();
+            });
+
+            $(document).on('mousemove', function(e) {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                self.$navigator.css({
+                    left: startLeft + dx,
+                    top: startTop + dy,
+                    right: 'auto',
+                    bottom: 'auto'
+                });
+            });
+
+            $(document).on('mouseup', () => isDragging = false);
 
             // Manual Style Live Preview
             $('#aipg-manual-bg-color').on('input', function () {
@@ -592,34 +734,87 @@
                 else $('#aipg-slider-padding').trigger('input');
             });
 
+            // Target Mode Toggle
+            $('#aipg-target-mode-toggle button').on('click', function () {
+                const mode = $(this).data('mode');
+                self.styleTargetMode = mode;
+                $('#aipg-target-mode-toggle button').removeClass('active');
+                $(this).addClass('active');
+
+                // Re-sync inputs to show values of the newly targeted element
+                self.syncManualInputsWithBlock();
+
+                // Re-highlight visually
+                if (self.$currentBlock) {
+                    const $target = self.getStyleTarget(self.$currentBlock);
+                    self.highlightBlock(self.$currentBlock);
+                }
+            });
+
+            // Spacing Target Toggles
+            $('#aipg-margin-target-toggle button, #aipg-padding-target-toggle button').on('click', function () {
+                const $group = $(this).parent();
+                const type = $group.attr('id').includes('margin') ? 'margin' : 'padding';
+                const mode = $(this).data('mode');
+
+                self[type + 'TargetMode'] = mode;
+                $group.find('button').removeClass('active');
+                $(this).addClass('active');
+
+                // Re-sync inputs to show values of the newly targeted element
+                self.syncManualInputsWithBlock();
+
+                // Re-highlight visually
+                if (self.$currentBlock) self.highlightBlock(self.$currentBlock);
+            });
+
+            // Tracking last focused input for unlinked slider behavior
+            $('.aipg-spacing-grid input').on('focus', function () {
+                const id = $(this).attr('id');
+                if (id.includes('-m')) self.lastFocusedMarginInput = id;
+                else if (id.includes('-p')) self.lastFocusedPaddingInput = id;
+            });
+
             // Sliders logic
             $('#aipg-slider-margin').on('input', function () {
                 const val = $(this).val();
                 const u = $('#aipg-margin-unit').val();
-                if ($('#aipg-link-margin').hasClass('active')) {
-                    $('#aipg-manual-mt, #aipg-manual-mb, #aipg-manual-ml, #aipg-manual-mr').val(val);
-                    if (self.$currentBlock) {
-                        self.$currentBlock.css('margin-top', val + u);
-                        self.$currentBlock.css('margin-bottom', val + u);
-                        self.$currentBlock.css('margin-left', val + u);
-                        self.$currentBlock.css('margin-right', val + u);
-                        self.markAsManualChanged();
+                if (self.$currentBlock) {
+                    const $target = self.getStyleTarget(self.$currentBlock, 'margin');
+                    if ($('#aipg-link-margin').hasClass('active')) {
+                        $('#aipg-manual-mt, #aipg-manual-mb, #aipg-manual-ml, #aipg-manual-mr').val(val);
+                        $target.css({ 'margin-top': val + u, 'margin-bottom': val + u, 'margin-left': val + u, 'margin-right': val + u });
+                    } else {
+                        // Unlinked: only affect the last focused or default field
+                        const targetId = self.lastFocusedMarginInput;
+                        $('#' + targetId).val(val);
+                        const cssProp = targetId.replace('aipg-manual-m', 'margin-'); // mt -> margin-t
+                        const finalProp = cssProp.replace('-t', '-top').replace('-b', '-bottom').replace('-l', '-left').replace('-r', '-right');
+                        $target.css(finalProp, val + u);
                     }
+                    self.highlightBlock(self.$currentBlock);
+                    self.markAsManualChanged();
                 }
             });
 
             $('#aipg-slider-padding').on('input', function () {
                 const val = $(this).val();
                 const u = $('#aipg-padding-unit').val();
-                if ($('#aipg-link-padding').hasClass('active')) {
-                    $('#aipg-manual-pt, #aipg-manual-pb, #aipg-manual-pl, #aipg-manual-pr').val(val);
-                    if (self.$currentBlock) {
-                        self.$currentBlock.css('padding-top', val + u);
-                        self.$currentBlock.css('padding-bottom', val + u);
-                        self.$currentBlock.css('padding-left', val + u);
-                        self.$currentBlock.css('padding-right', val + u);
-                        self.markAsManualChanged();
+                if (self.$currentBlock) {
+                    const $target = self.getStyleTarget(self.$currentBlock, 'padding');
+                    if ($('#aipg-link-padding').hasClass('active')) {
+                        $('#aipg-manual-pt, #aipg-manual-pb, #aipg-manual-pl, #aipg-manual-pr').val(val);
+                        $target.css({ 'padding-top': val + u, 'padding-bottom': val + u, 'padding-left': val + u, 'padding-right': val + u });
+                    } else {
+                        // Unlinked: only affect the last focused or default field
+                        const targetId = self.lastFocusedPaddingInput;
+                        $('#' + targetId).val(val);
+                        const cssProp = targetId.replace('aipg-manual-p', 'padding-');
+                        const finalProp = cssProp.replace('-t', '-top').replace('-b', '-bottom').replace('-l', '-left').replace('-r', '-right');
+                        $target.css(finalProp, val + u);
                     }
+                    self.highlightBlock(self.$currentBlock);
+                    self.markAsManualChanged();
                 }
             });
 
@@ -637,10 +832,14 @@
                 const mr = $('#aipg-manual-mr').val();
 
                 if (self.$currentBlock) {
-                    if (mt !== '') self.$currentBlock.css('margin-top', mt + u);
-                    if (mb !== '') self.$currentBlock.css('margin-bottom', mb + u);
-                    if (ml !== '') self.$currentBlock.css('margin-left', ml + u);
-                    if (mr !== '') self.$currentBlock.css('margin-right', mr + u);
+                    const $target = self.getStyleTarget(self.$currentBlock, 'margin');
+                    if (mt !== '') $target.css('margin-top', mt + u);
+                    if (mb !== '') $target.css('margin-bottom', mb + u);
+                    if (ml !== '') $target.css('margin-left', ml + u);
+                    if (mr !== '') $target.css('margin-right', mr + u);
+
+                    // Also update overlay in real-time
+                    self.highlightBlock(self.$currentBlock);
                     self.markAsManualChanged();
                 }
             });
@@ -658,10 +857,11 @@
                 const pr = $('#aipg-manual-pr').val();
 
                 if (self.$currentBlock) {
-                    if (pt !== '') self.$currentBlock.css('padding-top', pt + u);
-                    if (pb !== '') self.$currentBlock.css('padding-bottom', pb + u);
-                    if (pl !== '') self.$currentBlock.css('padding-left', pl + u);
-                    if (pr !== '') self.$currentBlock.css('padding-right', pr + u);
+                    const $target = self.getStyleTarget(self.$currentBlock, 'padding');
+                    if (pt !== '') $target.css('padding-top', pt + u);
+                    if (pb !== '') $target.css('padding-bottom', pb + u);
+                    if (pl !== '') $target.css('padding-left', pl + u);
+                    if (pr !== '') $target.css('padding-right', pr + u);
                     self.markAsManualChanged();
                 }
             });
@@ -695,8 +895,8 @@
                 }
             });
 
-            $('.aipg-mini-btn').on('click', function () {
-                $('.aipg-mini-btn').removeClass('active');
+            $('#aipg-add-pos-toggle button').on('click', function () {
+                $(this).parent().find('button').removeClass('active');
                 $(this).addClass('active');
             });
 
@@ -775,20 +975,130 @@
         updateModeUI: function () {
             if (this.aiEnabled) {
                 this.$toggle.addClass('aipg-mode-ai');
-                this.$toggle.find('.aipg-mode-label').text('AI Edit Mode: ON');
+                this.$toggle.find('.aipg-mode-label').html('AI Edit Mode: <span class="aipg-status-on">ON</span>');
                 this.$toggle.find('.aipg-mode-desc').text('Hover/Click elements to edit layout');
             } else {
                 this.$toggle.removeClass('aipg-mode-ai');
-                this.$toggle.find('.aipg-mode-label').text('Preview Mode');
+                this.$toggle.find('.aipg-mode-label').html('AI Edit Mode: <span class="aipg-status-off">OFF</span>');
                 this.$toggle.find('.aipg-mode-desc').text('Standard site interaction');
             }
         },
 
-        highlightBlock: function ($block) {
+        /**
+         * Resolves the element that should be used for UI interaction (highlighting).
+         * It climbs up from BEM internal elements (e.g. __background, __inner-container)
+         * to find the "real" element the user likely intends to interact with.
+         */
+        resolveInteractiveTarget($el) {
+            if (!$el || $el.length === 0) return null;
+
+            // If it's a structural internal (likely BEM like __background or __inner-container),
+            // climb up until we find a block root or a non-internal element.
+            // We search for classes containing "__" which is standard for Gutenberg internal components.
+            if ($el.attr('class') && $el.attr('class').includes('__')) {
+                const $parentBlock = $el.closest('[class*="wp-block-"]:not([class*="__"])');
+                if ($parentBlock.length > 0) return $parentBlock;
+            }
+
+            return $el;
+        },
+
+        /**
+         * Resolves the true block root for backend operations.
+         * Returns the nearest parent that is a genuine Gutenberg block (has wp-block- but NOT __).
+         */
+        resolveBlockRoot($el) {
+            if (!$el || $el.length === 0) return null;
+
+            // If it IS a block root already, return it
+            if ($el.is('[class*="wp-block-"]:not([class*="__"])')) return $el;
+
+            // Otherwise climb to the nearest block root
+            const $root = $el.closest('[class*="wp-block-"]:not([class*="__"])');
+            return $root.length > 0 ? $root : $el;
+        },
+
+        /**
+         * Resolves where padding/margin should be applied.
+         * For Cover and Group blocks, we often target the inner container.
+         */
+        getStyleTarget($block, type = 'padding') {
+            if (!$block || $block.length === 0) return $block;
+
+            const mode = (type === 'margin') ? this.marginTargetMode : this.paddingTargetMode;
+
+            if (mode === 'parent') {
+                // If we are current in a "root" block that has an inner container (Cover/Group),
+                // "Selected" normally dives into the inner. "Parent" should stay on the outer.
+                // If we are on a simple block, "Parent" should go to its containing block.
+
+                // Check if the current block is a known dived-into container
+                if ($block.is('.wp-block-cover__inner-container, .wp-block-group > div:first-child')) {
+                    return this.resolveBlockRoot($block);
+                }
+
+                // If it's a root that HAS an inner container, Parent mode targets this root (the wrapper)
+                // while Current targets the inner.
+                if ($block.hasClass('wp-block-cover') || $block.hasClass('wp-block-group')) {
+                    return $block;
+                }
+
+                // Fallback: try to find a real parent block
+                const $pBlock = $block.parent().closest('[class*="wp-block-"]:not([class*="__"])');
+                if ($pBlock.length) return $pBlock;
+
+                return this.resolveBlockRoot($block);
+            }
+
+            // mode === 'current' (Selected)
+            let $el = $block;
+            if ($el.hasClass('wp-block-cover')) {
+                const $inner = $el.find('.wp-block-cover__inner-container').first();
+                if ($inner.length) return $inner;
+            }
+            if ($el.hasClass('wp-block-group')) {
+                const $inner = $el.children('div').first();
+                if ($inner.length) return $inner;
+            }
+            return $el;
+        },
+
+        highlightBlock: function ($block, shouldScroll = true) {
+            if (!$block || !$block.length) return;
+
+            // Prevent redundant highlights for the same block
+            if (this.$currentBlock && this.$currentBlock[0] === $block[0] && this.$overlay.is(':visible')) {
+                return;
+            }
+
             this.$currentBlock = $block;
+
+            // Ensure element is visible
+            if (shouldScroll && this.$navigator && this.$navigator.is(':visible')) {
+                // REDESIGNED: Only scroll if the TOP of the element is off-screen
+                // This prevents large elements from jumping to their bottom/center
+                const rect = $block[0].getBoundingClientRect();
+                const vHeight = (window.innerHeight || document.documentElement.clientHeight);
+                
+                // If top is above viewport OR top is below 80% of viewport
+                const isOffScreen = rect.top < 0 || rect.top > (vHeight * 0.8);
+                
+                if (isOffScreen) {
+                    // Use 'nearest' for a much calmer scroll experience
+                    $block[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
             const offset = $block.offset();
             const width = $block.outerWidth();
             const height = $block.outerHeight();
+
+            // While editing, hide the interactive buttons to avoid distraction
+            if (this.isEditing) {
+                this.$overlay.find('.aipg-omni-node, .aipg-omni-del').hide();
+            } else {
+                this.$overlay.find('.aipg-omni-node, .aipg-omni-del').show();
+            }
 
             // Toggle compact mode for small elements - avoid overlapping icons
             if (width < 120 || height < 60) {
@@ -797,7 +1107,7 @@
                 this.$overlay.removeClass('aipg-compact');
             }
 
-            this.$overlay.css({
+            this.$overlay.stop(true, true).css({
                 top: offset.top,
                 left: offset.left,
                 width: width,
@@ -807,7 +1117,7 @@
 
         openModal: function () {
             this.isEditing = true;
-            $('.aipg-modal-backdrop').fadeIn(200);
+            // Backdrop removed per user request
             $('#aipg-refine-modal').addClass('aipg-sidebar-open');
             $('#aipg-prompt-input').val('').focus();
             $('#aipg-submit-edit').text('Refine with AI').prop('disabled', false);
@@ -817,11 +1127,16 @@
 
             // Populate manual tweak inputs with current block state
             this.syncManualInputsWithBlock();
+
+            // Sync Navigator if visible
+            if (this.$navigator && this.$navigator.is(':visible')) {
+                this.selectNavigatorNode(this.$currentBlock);
+            }
         },
 
         closeModal: function () {
             this.isEditing = false;
-            $('.aipg-modal-backdrop').fadeOut(200);
+            // Backdrop removed per user request
             $('#aipg-refine-modal').removeClass('aipg-sidebar-open');
             this.$overlay.hide();
         },
@@ -907,26 +1222,33 @@
 
         syncManualInputsWithBlock: function () {
             if (!this.$currentBlock) return;
-            const el = this.$currentBlock[0];
-            const styles = window.getComputedStyle(el);
+            const $mTarget = this.getStyleTarget(this.$currentBlock, 'margin');
+            const $pTarget = this.getStyleTarget(this.$currentBlock, 'padding');
+
+            const pEl = $pTarget[0];
+            const pStyles = window.getComputedStyle(pEl);
+            const mEl = $mTarget[0];
+            const mStyles = window.getComputedStyle(mEl);
+
+            // Background & Typography from padding target (usually current)
+            const styles = pStyles;
 
             // Background
             $('#aipg-manual-bg-color').val(this.rgbToHex(styles.backgroundColor));
 
-            // Typography
+            // Font Size
             const fs = parseInt(styles.fontSize);
-            $('#aipg-manual-fs-range').val(fs);
-            $('#aipg-manual-fs-num').val(fs);
+            if (!isNaN(fs)) $('#aipg-manual-fs-range, #aipg-manual-fs-num').val(fs);
+
+            // Text Color
             $('#aipg-manual-text-color').val(this.rgbToHex(styles.color));
 
-            // Spacing Initialization
+            // Helper to get unit
             const getInlineUnitAndVal = (computedPx, inlineStyleStr, defaultUnit) => {
                 let u = defaultUnit;
                 let v = 0;
                 if (inlineStyleStr && inlineStyleStr.match(/[a-z%]+$/)) {
                     u = inlineStyleStr.match(/[a-z%]+$/)[0];
-                    v = parseFloat(inlineStyleStr);
-                } else if (inlineStyleStr && parseFloat(inlineStyleStr)) {
                     v = parseFloat(inlineStyleStr);
                 } else {
                     const pxNum = parseFloat(computedPx) || 0;
@@ -935,12 +1257,11 @@
                         else v = pxNum;
                     }
                 }
-                return { unit: u, val: v };
+                return { unit: u, val: isNaN(parseFloat(v)) ? 0 : v };
             };
 
-            const ptData = getInlineUnitAndVal(styles.paddingTop, el.style.paddingTop, 'rem');
-            const mtData = getInlineUnitAndVal(styles.marginTop, el.style.marginTop, 'rem');
-
+            // Padding
+            const ptData = getInlineUnitAndVal(pStyles.paddingTop, pEl.style.paddingTop, 'rem');
             $('#aipg-padding-unit').val(ptData.unit).trigger('change');
             $('#aipg-margin-unit').val(mtData.unit).trigger('change');
 
@@ -970,8 +1291,8 @@
             else $('#aipg-slider-margin').val(0);
 
             // Width
-            if (this.$currentBlock.hasClass('alignfull')) $('#aipg-manual-width').val('full');
-            else if (this.$currentBlock.hasClass('alignconstrained')) $('#aipg-manual-width').val('constrained');
+            if ($target.hasClass('alignfull')) $('#aipg-manual-width').val('full');
+            else if ($target.hasClass('alignconstrained')) $('#aipg-manual-width').val('constrained');
             else $('#aipg-manual-width').val('');
 
             // Media
@@ -1102,31 +1423,9 @@
             let $block = this.$currentBlock;
             if (!$block) return;
 
-            // CRITICAL FIX: The user might be hovering on an internal structure element (like <span class="wp-block-cover__background">)
-            // that is NOT a real Gutenberg block in the DB. We MUST find the closest actual block wrapper.
-            // Rule 1: It MUST have a class starting with wp-block-
-            // Rule 2: It CANNOT be a BEM child element (containing __)
-            // Rule 3: It CANNOT be a generic inline/media tag disguised as a block root.
-            let $rootBlock = $block.closest('[class*="wp-block-"]');
-            while ($rootBlock.length) {
-                const className = $rootBlock[0].className || '';
-                const isBEMChild = className.includes('__');
-                const isDisallowedTag = $rootBlock.is('span, img, a, strong, em, b, i');
-
-                if (!isBEMChild && !isDisallowedTag) {
-                    break; // Found a valid root block
-                }
-
-                const $parent = $rootBlock.parent().closest('[class*="wp-block-"]');
-                if ($parent.length && $parent[0] !== $rootBlock[0]) {
-                    $rootBlock = $parent;
-                } else {
-                    break;
-                }
-            }
-            if ($rootBlock.length) {
-                $block = $rootBlock;
-            }
+            // Ensure we are operating on a genuine Gutenberg block root for stability
+            $block = this.resolveBlockRoot($block);
+            if (!$block) return;
 
             // Visual feedback
             const originalBorder = $block.css('border');
@@ -1209,26 +1508,9 @@
             let $block = this.$currentBlock;
             if (!$block) return;
 
-            // Follow the same rigid tree extraction logic to safely delete the right root level DOM node
-            let $rootBlock = $block.closest('[class*="wp-block-"]');
-            while ($rootBlock.length) {
-                const className = $rootBlock[0].className || '';
-                const isBEMChild = className.includes('__');
-                const isDisallowedTag = $rootBlock.is('span, img, a, strong, em, b, i');
-
-                if (!isBEMChild && !isDisallowedTag) {
-                    break;
-                }
-                const $parent = $rootBlock.parent().closest('[class*="wp-block-"]');
-                if ($parent.length && $parent[0] !== $rootBlock[0]) {
-                    $rootBlock = $parent;
-                } else {
-                    break;
-                }
-            }
-            if ($rootBlock.length) {
-                $block = $rootBlock;
-            }
+            // Ensure we are operating on a genuine Gutenberg block root for stability
+            $block = this.resolveBlockRoot($block);
+            if (!$block) return;
 
             const originalBorder = $block.css('border');
             $block.css('border', '2px solid #ef4444').fadeTo(200, 0.5);
@@ -1521,6 +1803,188 @@
                     $btn.text(originalText).prop('disabled', false);
                 }
             });
+        },
+
+        refreshNavigator: function() {
+            const $tree = this.$navigator.find('.aipg-nav-tree');
+            $tree.empty();
+            const self = this;
+            
+            // Collect main structural parts with priority
+            const $header = $('.aipg-part-header, header').first();
+            const $footer = $('.aipg-part-footer, footer').first();
+            
+            // For Body/Main, we look for typical content wrappers
+            const $main = $('main, .entry-content, #main-content, .wp-site-blocks > main').first();
+            
+            if ($header.length) self.buildTree($header, $tree);
+            
+            // If we found a main content area, add it specifically
+            if ($main.length && $main[0] !== $header[0] && $main[0] !== $footer[0]) {
+                self.buildTree($main, $tree);
+            } else if ($tree.children().length === 0) {
+                // Fallback to the wizard root or body if no specific parts found yet
+                const $root = $('#wp-studio-wizard-root');
+                self.buildTree($root.length ? $root : $('body'), $tree);
+            }
+            
+            if ($footer.length && $footer[0] !== $header[0]) {
+                self.buildTree($footer, $tree);
+            }
+        },
+
+        buildTree: function($container, $parentList) {
+            const self = this;
+            const skipTags = ['script', 'style', 'svg', 'br', 'hr', 'input', 'label'];
+            
+            $container.children().each(function() {
+                const $child = $(this);
+                
+                // Exclude AI UI elements
+                if ($child.hasClass('aipg-editor-modal') || $child.hasClass('aipg-mode-toggle') || $child.is('#wpadminbar')) {
+                    return;
+                }
+                
+                const tag = $child.prop('tagName').toLowerCase();
+                
+                if (skipTags.includes(tag)) return;
+                
+                // Reduce Spans: Skip span elements that have no classes
+                if (tag === 'span' && !$child.attr('class')) {
+                    self.buildTree($child, $parentList);
+                    return;
+                }
+                
+                const $item = self.createTreeItem($child);
+                $parentList.append($item);
+                
+                const $subList = $('<ul class="aipg-nav-children"></ul>');
+                $item.append($subList);
+                self.buildTree($child, $subList);
+                
+                if ($subList.children().length > 0) {
+                    $item.addClass('has-children expanded');
+                }
+            });
+        },
+
+        createTreeItem: function($el) {
+            const type = this.getElementType($el);
+            const icon = this.getElementIcon(type);
+            
+            const $item = $(`
+                <li class="aipg-nav-item">
+                    <div class="aipg-nav-label">
+                        <span class="aipg-nav-toggle"><svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="3" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+                        <span class="aipg-nav-type-icon">${icon}</span>
+                        <span class="aipg-nav-text">${type}</span>
+                    </div>
+                </li>
+            `);
+            
+            $item.data('el', $el);
+            return $item;
+        },
+
+        getElementType: function($el) {
+            const classes = $el.attr('class') || '';
+            const tag = $el.prop('tagName').toLowerCase();
+            
+            if (classes.includes('wp-block-heading')) return 'Heading';
+            if (classes.includes('wp-block-paragraph')) return 'Paragraph';
+            if (classes.includes('wp-block-image')) return 'Image';
+            if (classes.includes('wp-block-button')) return 'Button';
+            if (classes.includes('wp-block-group')) return 'Group';
+            if (classes.includes('wp-block-columns')) return 'Columns';
+            if (classes.includes('wp-block-column')) return 'Column';
+            if (classes.includes('wp-block-cover')) return 'Cover';
+            
+            // Critical Main Segments
+            if (classes.includes('aipg-part-header') || tag === 'header') return 'Header';
+            if (classes.includes('aipg-part-footer') || tag === 'footer') return 'Footer';
+            if (tag === 'main') return 'Main Content';
+            if (tag === 'body') return 'Page Body';
+            
+            return tag.charAt(0).toUpperCase() + tag.slice(1);
+        },
+
+        getElementIcon: function(type) {
+            const t = type.toLowerCase();
+            const iconMap = {
+                'heading': 'H',
+                'paragraph': 'P',
+                'image': '▨',
+                'button': '●',
+                'group': '▣',
+                'columns': '⫴',
+                'column': '▯',
+                'cover': '🌅',
+                'header': '▭',
+                'footer': '▱',
+                'div': '◇',
+                'span': '▫',
+                'section': '▭',
+                'article': '📝',
+                'main': '🏠',
+                'aside': '🗒️',
+                'nav': '🧭',
+                'ul': 'list',
+                'ol': 'list',
+                'li': '•',
+                'a': '🔗',
+                'img': '▨',
+                'p': 'P',
+                'h1': 'H1',
+                'h2': 'H2',
+                'h3': 'H3',
+                'h4': 'H4',
+                'h5': 'H5',
+                'h6': 'H6'
+            };
+            
+            // Refined check for specific tags
+            if (t.startsWith('h') && t.length <= 2) return t.toUpperCase();
+            if (t === 'p' || t === 'paragraph') return 'P';
+            if (t === 'img' || t === 'image') return '▨';
+            if (t === 'div') return '◇';
+            if (t === 'span') return '·';
+            if (t === 'a' || t === 'link') return '🔗';
+            if (t === 'ul' || t === 'ol') return '≣';
+            if (t === 'li') return '•';
+            if (t === 'button') return '●';
+            if (t === 'section' || t === 'article') return '▭';
+            if (t === 'header') return '▤';
+            if (t === 'footer') return 'row';
+
+            return iconMap[t] || '•';
+        },
+
+        selectNavigatorNode: function($el) {
+            const self = this;
+            if (!$el || !$el.length) return;
+            
+            // Find the item in the tree
+            const $items = this.$navigator.find('.aipg-nav-item');
+            let $foundItem = null;
+            
+            $items.each(function() {
+                if ($(this).data('el') && $(this).data('el')[0] === $el[0]) {
+                    $foundItem = $(this);
+                    return false;
+                }
+            });
+            
+            if ($foundItem) {
+                $('.aipg-nav-item').removeClass('active');
+                $foundItem.addClass('active');
+                
+                // Expand parents
+                $foundItem.parents('.aipg-nav-item').addClass('expanded');
+                
+                // Scroll into view
+                const $area = this.$navigator.find('.aipg-nav-tree-area');
+                $area.scrollTop($area.scrollTop() + $foundItem.position().top - 50);
+            }
         }
     };
 

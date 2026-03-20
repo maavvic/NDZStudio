@@ -301,7 +301,11 @@ function aipg_inject_studio_custom_styles() {
     echo "<style id='aipg-studio-dynamic-styles'>\n{$css}\n</style>\n";
 
     // 4. Inject Custom CSS from AI
-    $custom_css = get_option( 'aipg_studio_custom_css', '' );
+    $custom_css = get_post_meta( $post_id, '_aipg_custom_css', true );
+    if ( empty( $custom_css ) ) {
+        $custom_css = get_option( 'aipg_studio_custom_css', '' );
+    }
+
     if ( ! empty( $custom_css ) ) {
         echo "<style id='aipg-studio-custom-ai-css'>\n/* AI Generated Styles */\n" . wp_strip_all_tags( $custom_css ) . "\n</style>\n";
     }
@@ -2058,11 +2062,17 @@ function aipg_ajax_install_prototype() {
     if ( isset( $data['theme_json'] ) && !empty($data['theme_json'])) {
         error_log('[AI Studio] Updating theme_config. Palette size: ' . (isset($data['theme_json']['settings']['color']['palette']) ? count($data['theme_json']['settings']['color']['palette']) : '0'));
         update_option( 'aipg_studio_theme_config', $data['theme_json'] );
+        if ( $home_page_id > 0 ) {
+            update_post_meta( $home_page_id, '_aipg_theme_json', $data['theme_json'] );
+        }
     }
 
     // Store Custom CSS if provided
     if ( isset( $data['custom_css'] ) ) {
         update_option( 'aipg_studio_custom_css', $data['custom_css'] );
+        if ( $home_page_id > 0 ) {
+            update_post_meta( $home_page_id, '_aipg_custom_css', $data['custom_css'] );
+        }
     } else {
         delete_option( 'aipg_studio_custom_css' );
     }
@@ -2509,15 +2519,22 @@ function aipg_ajax_studio_contextual_edit() {
 
     // 2. Scan all Block Templates if not found in primary post
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $current_layout_id = get_post_meta( $post_id, '_aipg_layout_id', true );
         $templates = array_merge( 
             get_block_templates( array(), 'wp_template' ), 
             get_block_templates( array(), 'wp_template_part' ) 
         );
 
         // Sort FSE templates so the most specific templates for this post type are checked first
-        usort($templates, function($a, $b) use ($post) {
+        // and prioritize templates with the current layout_id in their slug
+        usort($templates, function($a, $b) use ($post, $current_layout_id) {
             $scoreA = 0; $scoreB = 0;
             
+            if ($current_layout_id) {
+                if (strpos($a->slug, $current_layout_id) !== false) $scoreA += 100;
+                if (strpos($b->slug, $current_layout_id) !== false) $scoreB += 100;
+            }
+
             if ($post->post_type === 'page') {
                 if (in_array($a->slug, ['page', 'front-page', 'singular'])) $scoreA += 10;
                 if (in_array($b->slug, ['page', 'front-page', 'singular'])) $scoreB += 10;
@@ -2896,7 +2913,19 @@ function aipg_ajax_studio_insert_element() {
     $matched_block_node = aipg_find_block_in_tree( $full_parsed_tree, $lookup_markup, $search_debug_log );
 
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $current_layout_id = get_post_meta( $post_id, '_aipg_layout_id', true );
         $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
+
+        // Prioritize templates with the current layout_id in their slug
+        usort( $templates, function($a, $b) use ($current_layout_id) {
+            if ( ! $current_layout_id ) return 0;
+            $a_match = strpos( $a->slug, $current_layout_id ) !== false;
+            $b_match = strpos( $b->slug, $current_layout_id ) !== false;
+            if ( $a_match && ! $b_match ) return -1;
+            if ( ! $a_match && $b_match ) return 1;
+            return 0;
+        });
+
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
             $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
@@ -3078,7 +3107,19 @@ function aipg_ajax_studio_manual_edit() {
 
     // 2. Scan templates if not found
     if ( ! $matched_block_node && function_exists('get_block_templates') ) {
+        $current_layout_id = get_post_meta( $post_id, '_aipg_layout_id', true );
         $templates = array_merge( get_block_templates( array(), 'wp_template' ), get_block_templates( array(), 'wp_template_part' ) );
+
+        // Prioritize templates with the current layout_id in their slug
+        usort( $templates, function($a, $b) use ($current_layout_id) {
+            if ( ! $current_layout_id ) return 0;
+            $a_match = strpos( $a->slug, $current_layout_id ) !== false;
+            $b_match = strpos( $b->slug, $current_layout_id ) !== false;
+            if ( $a_match && ! $b_match ) return -1;
+            if ( ! $a_match && $b_match ) return 1;
+            return 0;
+        });
+
         foreach($templates as $t) {
             $test_tree = parse_blocks( $t->content );
             $match = aipg_find_block_in_tree( $test_tree, $lookup_markup, $search_debug_log );
